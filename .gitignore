@@ -1,0 +1,10 @@
+# users
+.vs
+
+#debug
+Debug
+Release
+
+#
+water_line/Debug
+water_line/Release
