@@ -1,10 +1,11 @@
 # users
 .vs
 
-#debug
+#
 Debug
 Release
-
+x64
 #
 water_line/Debug
 water_line/Release
+water_line/x64
