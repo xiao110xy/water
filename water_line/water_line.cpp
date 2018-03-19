@@ -1,20 +1,40 @@
-// water_line.cpp : ¶¨Òå¿ØÖÆÌ¨Ó¦ÓÃ³ÌĞòµÄÈë¿Úµã¡£
-//
+ï»¿#include "stdafx.h"
+#include "water_line.h"
 
-#include "stdafx.h"
 
-#include "opencv2/highgui/highgui.hpp"
-#include "opencv2/imgproc/imgproc.hpp"  
-#include "opencv2/core/core.hpp"
-
-using namespace std;
-using namespace cv;
-int main()
+water_line::water_line()
 {
-	Mat image = imread("4.png");  //´æ·Å×Ô¼ºÍ¼ÏñµÄÂ·¾¶ 
-	imshow("ÏÔÊ¾Í¼Ïñ", image);
-	waitKey(0);
-	
-    return 0;
 }
 
+
+water_line::~water_line()
+{
+}
+
+void get_line(Mat image)
+{
+	float det_v = 22.5; float det_h = 22.5;
+	Mat data;
+	cvtColor(image, data, CV_BGR2GRAY);
+	// lsdè®¡ç®—ç›´çº¿
+	Ptr<LineSegmentDetector> ls = createLineSegmentDetector(LSD_REFINE_STD);
+	std::vector<Vec4f> lines_std;
+	ls->detect(data, lines_std);
+	//è®¡ç®—ç›´çº¿é•¿åº¦ã€è§’åº¦
+	auto b = lines_std.begin(); auto e = lines_std.end();
+	for (auto i = b; i != b; ++i) {
+		Vec4f temp(*i);
+		int x = temp.val[0];
+
+	}
+	// æŒ‰é•¿åº¦è¿›è¡Œæ’åº
+	// ç«–ç›´ç›´çº¿
+	// æ°´å¹³ç›´çº¿
+	
+
+
+	//ls->drawSegments(data, lines_std);
+	//namedWindow("Test");
+	//imshow("Test", data);
+
+}
