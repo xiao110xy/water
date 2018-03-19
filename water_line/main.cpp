@@ -19,8 +19,10 @@ int main(int argc, char** argv)
 		printf(" No image data \n ");
 		return -1;
 	}
-
-	get_line(image);
+	std::vector<Matx<float, 6, 1>> lines1, lines2;
+	get_line(image,lines1,lines2);
+	Mat result = draw_line(image, lines1);
+	imshow("ok",result);
 	waitKey(0);
 	return 0;
 }
