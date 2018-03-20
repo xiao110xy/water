@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <vector> 
 #include <string>
+#include <list>
 
 class water_line
 {
@@ -16,4 +17,5 @@ void get_line(Mat image, float det_v, float det_h, vector<Matx<float, 6, 1>> &li
 void get_line(Mat image,vector<Matx<float, 6, 1>> &lines1, vector<Matx<float, 6, 1>> &lines2);
 
 vector<Matx<float, 12, 1>> get_parallel_lines(Mat image, vector<Matx<float, 6, 1>> lines1, vector<Matx<float, 6, 1>> lines2);
-Matx<float, 6, 1> merge_line(Matx<float, 6, 1> line, vector<Matx<float, 6, 1>> lines, float angle_t, float d_v_t, float d_p_t);
+vector<Matx<float, 6, 1>> merge_line(Matx<float, 6, 1> line, vector<Matx<float, 6, 1>> lines, vector<Matx<float, 6, 1>> &data, float angle_t, float d_v_t, float d_p_t);
+vector<Matx<float, 7, 1>> porject_line(Matx<float, 6, 1> line, vector<Matx<float, 6, 1>> lines);
