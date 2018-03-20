@@ -5,7 +5,7 @@
 #include "water_line.h"
 #include <iostream>
 
-using namespace std;
+
 
 
 int main(int argc, char** argv)
@@ -19,10 +19,9 @@ int main(int argc, char** argv)
 		printf(" No image data \n ");
 		return -1;
 	}
-	std::vector<Matx<float, 6, 1>> lines1, lines2;
+	vector<Matx<float, 6, 1>> lines1, lines2;
 	get_line(image,lines1,lines2);
-	Mat result = draw_line(image, lines1);
-	imshow("ok",result);
+	get_parallel_lines(image, lines1, lines2);
 	waitKey(0);
 	return 0;
 }
