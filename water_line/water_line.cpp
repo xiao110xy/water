@@ -546,9 +546,13 @@ float segement_area(Mat I, vector<Matx<float, 12, 1>> parallel_lines)
 		minMaxIdx(temp.row(0), &temp1, &temp2);
 		c1 = (int)round(temp1) >= 0 ? (int)round(temp1) : 0;
 		c2 = (int)round(temp2) <= image_rotate.cols ? (int)round(temp2) : image_rotate.cols;
-		minMaxIdx(temp.row(1), &temp1, &temp2);
-		r1 = (int)round(temp1) >= 0 ? (int)round(temp1) : 0;
-		r2 = (int)round(temp2) <= image_rotate.rows ? (int)round(temp2) : image_rotate.rows;
+		temp1 = (double)temp.at<float>(1, 0);
+		temp2 = (double)temp.at<float>(1, 2);
+		r1 = temp1 >= temp2 ? (int)ceil(temp1) : (int)ceil(temp2);
+		temp1 = (double)temp.at<float>(1, 1);
+		temp2 = (double)temp.at<float>(1, 3);
+		r2 = temp1 <= temp2 ? (int)floor(temp1) : (int)floor(temp2);
+		r2 = r2 <= image_rotate.rows ? r2 : image_rotate.rows;
 		Mat data = image_rotate(Range(r1, r2), Range(c1, c2));
 		// 精细化小区域
 		bool flag = sub_water_area(data, line1, line2);
@@ -600,5 +604,107 @@ bool sub_water_area(Mat &I, Mat &line1, Mat &line2)
 	}
 	lines1 = temp;
 	// 竖直直线投影到竖直方向上
+	lines2 = select_v_lines(I, lines1, lines2);
+	// 求解出边界
+	Mat location = get_e_boundary(I, lines2);
+	I = I(Range(0, I.rows), Range(location.at<int>(0, 0), location.at<int>(0, 1)));
 	return true;
+}
+
+vector<Matx<float, 6, 1>> select_v_lines(Mat I, vector<Matx<float, 6, 1>> lines1, vector<Matx<float, 6, 1>> lines2)
+{
+	Mat data(I.rows, 1, CV_32F,Scalar(0));
+	for (auto &i : lines1) {
+		int y1, y2;
+		y1 = round(i.val[1]) >= 0 ? (int)round(i.val[1]) : 0;
+		y2 = round(i.val[3]) <= I.rows ? (int)round(i.val[3]) : (int)I.rows;
+		data.rowRange(y1, y2).setTo(1);
+	}
+	// 
+	Mat Kernel = (cv::Mat_<float>(2, 1) << -1, 1);
+	Mat dy;
+	filter2D(data, dy, -1, Kernel, cv::Point(-1, -1), 0.0, cv::BORDER_CONSTANT);
+	//
+	vector<Matx<int,3,1>> index;
+	int y1=0, y2=0;
+	for (int i = 0; i < dy.rows;++i) {
+		if (dy.at<float>(i, 0) > 0.5) {
+			y1 = i;
+		}
+		if (dy.at<float>(i, 0) < -0.5) {
+			y2 = i;
+			index.push_back(Matx<int, 3, 1>(y1, y2, y2 - y1+1));
+		}
+	}
+	if (y1 > (*(index.end()-1)).val[1]) {
+		y2 = I.rows - 1;
+		index.push_back(Matx<int, 3, 1>(y1, y2, y2 - y1 + 1));
+	}
+	stable_sort(index.begin(), index.end(),
+		[](const Matx<float, 3, 1>&a, const Matx<float, 3, 1>&b) {return a.val[2] > b.val[2]; });
+	if (index.size() < 1) {
+		return vector<Matx<float, 6, 1>>();
+	}
+	y1 = (*index.begin()).val[0];	y2 = (*index.begin()).val[1];
+	//
+	bool flag = false;
+	vector<Matx<float, 6, 1>> result;
+	for (auto &i : lines2)
+	{
+		flag = (i.val[1]>=y1) && (i.val[1] <= y2) && (i.val[3] >= y1) && (i.val[3] <= y2);
+		if (flag) {
+			result.push_back(i);
+			flag = false;
+		}
+	}
+	return result;
+}
+
+Mat get_e_boundary(Mat I, vector<Matx<float, 6, 1>> lines)
+{
+	Mat temp(1, I.cols, CV_32F,Scalar(0));
+	int x1, x2;
+	for (auto &i : lines) {
+		x1 = (int)round(i.val[0]) >= 0 ? (int)round(i.val[0]) : 0;
+		x2 = (int)round(i.val[2]) <= I.cols ? (int)round(i.val[2]) : I.cols;
+		temp.colRange(x1, x2) += 1.0;
+	}
+	vector<int> index;
+	for (int i = 0; i < I.cols;++i) {
+		if (temp.at<float>(0, i) > 3) {
+			index.push_back(i);
+		}
+	}
+	Mat data(3, 3, CV_32S, Scalar(0));
+	// 中
+	data.at<int>(0, 0) = *(index.begin());
+	data.at<int>(0, 1) = *(index.end()-1);
+	data.at<int>(0, 2) = data.at<int>(0, 1) - data.at<int>(0, 0);
+	// 左边
+	data.at<int>(1, 0) = *(index.begin());
+	data.at<int>(1, 1) = (int)round(2*(*(index.end() - 1))- *(index.begin()));
+	data.at<int>(1, 2) = data.at<int>(1, 1) - data.at<int>(1, 0);
+	// 右边
+	data.at<int>(2, 0) = (int)round(2 * (*index.begin()) - *(index.end()-1));
+	data.at<int>(2, 1) = (*(index.end() - 1)) ;
+	data.at<int>(2, 2) = data.at<int>(2, 1) - data.at<int>(2, 0);
+	for (int i = 0; i < 3; ++i) {
+		if (data.at<int>(i, 2) <15) {
+			data.at<int>(i, 2) = -1;
+			continue;
+		}
+		if ((data.at<int>(i, 0) < -5) || (data.at<int>(i, 1) > 9.0*I.cols / 8.0)) {
+			data.at<int>(i, 2) = -1;
+			continue;
+		}
+	}
+	Mat location(1, 3, CV_32S, Scalar(0));
+	for (int i = 0; i < 3; ++i) {
+		if (data.at<int>(i, 2) > location.at<int>(0,2)) {
+			location.at<int>(0, 0) = data.at<int>(i, 0);
+			location.at<int>(0, 1) = data.at<int>(i, 1);
+			location.at<int>(0, 2) = data.at<int>(i, 2);
+		}
+	}
+	return location;
 }

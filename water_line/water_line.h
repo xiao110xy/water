@@ -26,3 +26,5 @@ bool pnpoly(int nvert, float *vertx, float *verty, float testx, float testy);
 
 float segement_area(Mat I, vector<Matx<float, 12, 1>> parallel_lines);
 bool sub_water_area(Mat &I, Mat &line1,Mat &line2);
+vector<Matx<float, 6, 1>> select_v_lines(Mat I, vector<Matx<float, 6, 1>> lines1, vector<Matx<float, 6, 1>> lines2);
+Mat get_e_boundary(Mat I, vector<Matx<float, 6, 1>> lines);
