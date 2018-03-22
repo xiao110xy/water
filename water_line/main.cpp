@@ -9,7 +9,6 @@
 
 int main(int argc, char** argv)
 {
-
 	char* imageName = argv[1];
 	// 读入图像
 	Mat image,imshow_image;
