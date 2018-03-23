@@ -4,6 +4,11 @@
 //
 
 #pragma once
+#ifdef _DEBUG
+#define DEBUG_IF(cond) if(cond)
+#else
+#define DEBUG_IF(cond) if(false)
+#endif
 
 #include "targetver.h"
 

@@ -94,9 +94,32 @@ Mat draw_point(Mat data, vector<Mat> points)
 		}
 	}
 	return result;
-	return Mat();
 }
-
+Mat draw_point(Mat data, vector<vector<float>> points)
+{
+	Mat result;
+	if (data.channels() == 1) {
+		Mat temp[3];
+		temp[0] = data.clone(); temp[1] = data.clone(); temp[2] = data.clone();
+		merge(temp, 3, result);
+	}
+	else {
+		result = data.clone();
+	}
+	vector<Scalar> rgb;
+	rgb.push_back(Scalar(0, 255, 0));
+	rgb.push_back(Scalar(0, 0, 255));
+	rgb.push_back(Scalar(255, 0, 0));
+	int x = 0, y = 0, flag = 0;
+	for (auto &i : points) {
+		x = (int)i[0];
+		y = (int)i[1];
+		flag = (int)i[2];
+		flag = flag == -1 ? 0 : 1;
+		circle(result, Point2i(x, y), 2, rgb[flag], -1);
+	}
+	return result;
+}
 void get_line(cv::Mat image, float det_v, float det_h, vector<Matx<float, 6, 1>>& lines1, vector<Matx<float, 6, 1>>& lines2)
 {
 	Mat data;
@@ -526,7 +549,7 @@ bool pnpoly(int nvert, float * vertx, float * verty, float testx, float testy)
 	return c;
 }
 
-float segement_area(Mat I, vector<Matx<float, 12, 1>> parallel_lines)
+float segement_area(Mat I, vector<Matx<float, 12, 1>> parallel_lines, vector<vector<Mat>> &model)
 {
 	vector<Mat> result;
 	Mat line1(2, 4, CV_32F), line2(2, 4, CV_32F);
@@ -600,9 +623,11 @@ float segement_area(Mat I, vector<Matx<float, 12, 1>> parallel_lines)
 		Mat data = image_rotate(Range(r1, r2), Range(c1, c2));
 		// 精细化小区域
 		Mat location = sub_water_area(data, line1, line2);
-		// 
-		vector<vector<Point2i>> points = compute_point(data, location);
-
+		// 计算e点确切位置
+		vector<vector<float>> points = compute_e_point(data, location);
+		data = data(Range(0, data.rows), Range(location.at<int>(0, 0), location.at<int>(0, 1) + 1));
+		//Mat temp_im = draw_point(data, points);
+		vector<vector<float>> number = number_recgnition(data,model);
 		return 0.0f;
 	}
 	return 0.0f;
@@ -751,7 +776,7 @@ Mat get_e_boundary(Mat I, vector<Matx<float, 6, 1>> lines)
 	return location;
 }
 
-vector<vector<Point2i>> compute_point(Mat I, Mat location)
+vector<vector<float>> compute_e_point(Mat I, Mat location)
 {
 	I = I(Range(0, I.rows), Range(location.at<int>(0, 0), location.at<int>(0, 1) + 1));
 	// 对原始影像进行缩放
@@ -800,11 +825,17 @@ vector<vector<Point2i>> compute_point(Mat I, Mat location)
 		points.push_back(temp);
 	}
 	// 三点建立联系
-	vector<Mat> e_area_points = get_e_points(I, points);
-	// 对候选区域进行处理，以确定E左右中点的位置，从而在某种程度上精确定位
-	get_e_area(im, e_area_points);
-
-	return vector<vector<Point2i>>();
+	vector<Mat> e_proposal_points = get_e_proposal_points(I, points);
+	// 对候选区域进行处理，优化e点,以确定E左右中点的位置，从而在某种程度上精确定位
+	vector<vector<float>> result = better_e_points(im, e_proposal_points);
+	if (result.size() == 0)
+		return vector<vector<float>>();
+	// 同比缩放
+	int x = (int)round((*result.begin())[0] * scale);
+	for (auto &i : result) {
+		i[0] = (float)x;
+	}
+	return result;
 }
 
 vector<Point2i> localmax_point(Mat score_image, float d_t, float scale)
@@ -852,7 +883,7 @@ vector<Point2i> localmax_point(Mat score_image, float d_t, float scale)
 	return point;
 }
 
-vector<Mat> get_e_points(Mat im, vector<vector<Point2i>> points)
+vector<Mat> get_e_proposal_points(Mat im, vector<vector<Point2i>> points)
 {
 	vector<Mat> result;
 	vector<Point2i> point_0 = points[0], point_1 = points[1], point_2 = points[2];
@@ -890,7 +921,7 @@ vector<Mat> get_e_points(Mat im, vector<vector<Point2i>> points)
 	return result;
 }
 
-void get_e_area(Mat im, vector<Mat> points)
+vector<vector<float>> better_e_points(Mat im, vector<Mat> points)
 {
 	vector<Mat> data1, data2;
 	vector<int> point_x;
@@ -987,9 +1018,8 @@ void get_e_area(Mat im, vector<Mat> points)
 			score1.push_back((float)-3);
 			score2.push_back((float)-3);
 		}
-		get_e_location(im, score1, score2, (float)r1, (float)0.4, x);
-
-		return;
+		vector<vector<float>> result = get_e_location(im, score1, score2, (float)r1, (float)0.4, x);
+		return result;
 }
 
 vector<vector<float>> get_e_location(Mat im, vector<float> score1, vector<float> score2, float distance_t, float score_t, int x)
@@ -1042,7 +1072,7 @@ vector<vector<float>> get_e_location(Mat im, vector<float> score1, vector<float>
 		}
 		temp_y2 = temp_y1 + temp_y2;
 		if ((temp_score1 < score_t) && (temp_score2 < score_t))
-			continue;
+			break;
 		if ((temp_score1 > score_t) && (temp_score2 > score_t) && abs(temp_y1 + temp_y2 - 2 * temp_yo) < 10) {
 			temp_result[0] = (float)x; temp_result[1] = (float)temp_y2;
 			temp_result[2] = (float)-1; temp_result[3] = (float)temp_score2;
@@ -1053,7 +1083,7 @@ vector<vector<float>> get_e_location(Mat im, vector<float> score1, vector<float>
 			continue;
 		}
 		if (temp_score1 > score_t) {
-			int temp_y = int(round((temp_y1 + temp_yo) / 2));
+			int temp_y = int(round((temp_y1 + temp_yo) / 2.0));
 			float temp_score = score2[temp_y];
 			if ((temp_score > score_t) && abs(temp_y - temp_yo) > 0.8*distance_t) {
 				temp_y2 = temp_y;
@@ -1068,9 +1098,9 @@ vector<vector<float>> get_e_location(Mat im, vector<float> score1, vector<float>
 			}
 		}
 		if (temp_score2 > score_t) {
-			int temp_y = 2*temp_y2 -temp_yo;
+			int temp_y = 2 * temp_y2 - temp_yo;
 			float temp_score = score1[temp_y];
-			if ((temp_score > score_t) && abs(temp_y - temp_yo) <2.5*distance_t) {
+			if ((temp_score > score_t) && abs(temp_y - temp_yo) < 2.5*distance_t) {
 				temp_y1 = temp_y;
 				temp_score1 = temp_score;
 				temp_result[0] = (float)x; temp_result[1] = (float)temp_y2;
@@ -1084,8 +1114,68 @@ vector<vector<float>> get_e_location(Mat im, vector<float> score1, vector<float>
 		}
 	}
 	// 寻找下方的E
+	while (1) {
+		int temp_yo = 0, temp_y1 = 0, temp_y2 = 0;
+		temp_yo = (int)(*(result.end() - 1))[1];
+		float temp_score1 = -3, temp_score2 = -3;
+		int y1, y2;
+		y1 = (int)floor(temp_yo + 1.5*distance_t);
+		y2 = (int)ceil(temp_yo + 2.5*distance_t);
+		if ((y1 >= im.rows) && (y2 >= im.rows))
+			break;
+		else if (y1 >= im.rows)
+			y1 = im.rows - 1;
+		vector<float> temp1(score1.begin() + y1, score1.begin() + y2 + 1);
+		for (int i = 0; i < temp1.size(); ++i) {
+			if (temp_score1 < temp1[i]) {
+				temp_score1 = temp1[i];
+				temp_y1 = i;
+			}
+		}
+		temp_y1 = temp_y1 + y1;
 
-	return vector<vector<float>>();
+		vector<float> temp2(score2.begin() + temp_yo, score2.begin() + temp_y1 + 1);
+		for (int i = 0; i < temp2.size(); ++i) {
+			if (temp_score2 < temp2[i]) {
+				temp_score2 = temp2[i];
+				temp_y2 = i;
+			}
+		}
+		temp_y2 = temp_yo + temp_y2;
+		if ((temp_score1 < score_t) && (temp_score2 < score_t))
+			break;
+		if ((temp_score1 > score_t) && (temp_score2 > score_t) && abs(temp_y1 + temp_yo - 2 * temp_y2) < 10) {
+			temp_result[0] = (float)x; temp_result[1] = (float)temp_y2;
+			temp_result[2] = (float)-1; temp_result[3] = (float)temp_score2;
+			result.insert(result.end(), temp_result);
+			temp_result[0] = (float)x; temp_result[1] = (float)temp_y1;
+			temp_result[2] = (float)1; temp_result[3] = (float)temp_score1;
+			result.insert(result.end(), temp_result);
+			continue;
+		}
+		if (temp_score1 > score_t) {
+			int temp_y = int(round((temp_y1 + temp_yo) / 2));
+			float temp_score = score2[temp_y];
+			if ((temp_score > score_t) && abs(temp_y - temp_yo) > 0.8*distance_t) {
+				temp_y2 = temp_y;
+				temp_score2 = temp_score;
+				temp_result[0] = (float)x; temp_result[1] = (float)temp_y2;
+				temp_result[2] = (float)-1; temp_result[3] = (float)temp_score2;
+				result.insert(result.end(), temp_result);
+				temp_result[0] = (float)x; temp_result[1] = (float)temp_y1;
+				temp_result[2] = (float)1; temp_result[3] = (float)temp_score1;
+				result.insert(result.end(), temp_result);
+				continue;
+			}
+		}
+		if (temp_score2 > score_t && abs(temp_y2 - temp_yo) > 0.8*distance_t) {
+			temp_result[0] = (float)x; temp_result[1] = (float)temp_y2;
+			temp_result[2] = (float)-1; temp_result[3] = (float)temp_score2;
+			result.insert(result.end(), temp_result);
+			break;
+		}
+	}
+	return result;
 }
 
 float corr_data(Mat im, vector<Mat> data)
@@ -1131,6 +1221,44 @@ vector<int> class_score(Mat corr_matrix, float score_t)
 	return index;
 }
 
+
+vector<vector<float>> number_recgnition(Mat data, vector<vector<Mat>> &model)
+{
+
+	return vector<vector<float>>();
+}
+
+vector<string> getFiles(string folder, string firstname, string lastname)
+{
+	vector<string> files;
+	//文件句柄  
+	long long hFile = 0;
+	//文件信息  
+	struct _finddata_t fileinfo;   //大家可以去查看一下_finddata结构组成                            
+								   //以及_findfirst和_findnext的用法，了解后妈妈就再也不用担心我以后不会编了  
+	string p(folder);
+	p.append("\\");
+	p.append(firstname);
+	p.append("*");
+	p.append(lastname);
+	if ((hFile = _findfirst(p.c_str(), &fileinfo)) != -1) {
+		do {
+			//如果是目录,迭代之  
+			//如果不是,加入列表  
+			if ((fileinfo.attrib & _A_SUBDIR)) {
+				continue;
+				/*if (strcmp(fileinfo.name, ".") != 0 && strcmp(fileinfo.name, "..") != 0)
+					getFiles(p.assign(folder).append("\\").append(fileinfo.name), files);*/
+			}
+			else {
+				string temp = p.assign(folder).append("\\").append(fileinfo.name);
+				files.push_back(p.assign(folder).append("\\").append(fileinfo.name));
+			}
+		} while (_findnext(hFile, &fileinfo) == 0);
+		_findclose(hFile);
+	}
+	return files;
+}
 vector<int> sub2ind(Mat m, vector<Point2i> point)
 {
 	int temp;
