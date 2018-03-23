@@ -84,13 +84,13 @@ Mat draw_point(Mat data, vector<Mat> points)
 	vector<Scalar> rgb;
 	rgb.push_back(Scalar(0, 255, 0));
 	rgb.push_back(Scalar(0, 0, 255));
-	rgb.push_back(Scalar(255,0, 0));
+	rgb.push_back(Scalar(255, 0, 0));
 	int x = 0, y = 0;
 	for (auto &i : points) {
 		for (int j = 0; j < 3; ++j) {
 			x = i.at<int>(j, 0);
 			y = i.at<int>(j, 1);
-			circle(result,Point2i(x,y), 2, rgb[j], -1);
+			circle(result, Point2i(x, y), 2, rgb[j], -1);
 		}
 	}
 	return result;
@@ -879,12 +879,12 @@ vector<Mat> get_e_points(Mat im, vector<vector<Point2i>> points)
 				break;
 			}
 		}
-		if ((abs(y2 + y1 - 2 * yo) > 5) || (abs(x2 + x1 - 2 * xo)>5) || temp1 == -1 || temp2 == -1) {
+		if ((abs(y2 + y1 - 2 * yo) > 5) || (abs(x2 + x1 - 2 * xo) > 5) || temp1 == -1 || temp2 == -1) {
 			continue;
 		}
 		point_1.erase(point_1.begin() + temp1);
 		point_2.erase(point_2.begin() + temp2);
-		Mat temp = (Mat_<int>(3,2)<<xo, yo, x1, y1, x2, y2);
+		Mat temp = (Mat_<int>(3, 2) << xo, yo, x1, y1, x2, y2);
 		result.push_back(temp);
 	}
 	return result;
@@ -906,27 +906,229 @@ void get_e_area(Mat im, vector<Mat> points)
 			y2 = y2 > temp_point.at<int>(j, 1) ? y2 : temp_point.at<int>(j, 1);
 		}
 		Mat temp;
-		temp = im(Range(y1, y2 + 1),Range(0, xo + 1));
+		temp = im(Range(y1, y2 + 1), Range(0, xo + 1));
 		data1.push_back(temp.clone());
-		temp = im(Range(y1, y2 + 1),Range(xo + 1, im.cols) );
+		temp = im(Range(y1, y2 + 1), Range(xo + 1, im.cols));
 		data2.push_back(temp.clone());
 		point_x.push_back(xo);
 	}
 	// 计算互相的相互关系
-	Mat corr_matrix1 = Mat::zeros(points.size(), points.size(), CV_32F);
-	Mat	corr_matrix2 = Mat::zeros(points.size(), points.size(), CV_32F);
-	for (int i =0;i<points.size();++i)
+	Mat corr_matrix1 = Mat::zeros((int)points.size(), (int)points.size(), CV_32F);
+	Mat	corr_matrix2 = Mat::zeros((int)points.size(), (int)points.size(), CV_32F);
+	for (int i = 0; i < points.size(); ++i)
 		for (int j = 0; j < points.size(); ++j) {
-			if (i==j){
+			if (i == j) {
 				continue;
 			}
 			Mat temp1, temp2;
+			Mat result;
 			(*(data1.begin() + i)).copyTo(temp1);
 			(*(data1.begin() + j)).copyTo(temp2);
-
-			matchTemplate()
+			resize(temp2, temp2, temp1.size(), cv::INTER_LINEAR);
+			matchTemplate(temp1, temp2, result, CV_TM_CCOEFF_NORMED);
+			corr_matrix1.at<float>(i, j) = result.at<float>(0, 0);
+			(*(data2.begin() + i)).copyTo(temp1);
+			(*(data2.begin() + j)).copyTo(temp2);
+			resize(temp2, temp2, temp1.size(), cv::INTER_LINEAR);
+			matchTemplate(temp1, temp2, result, CV_TM_CCOEFF_NORMED);
+			corr_matrix2.at<float>(i, j) = result.at<float>(0, 0);
 		}
-	return;
+	//
+	vector<int> index1 = class_score(corr_matrix1, (float)0.5);
+	vector<int> index2 = class_score(corr_matrix2, (float)0.4);
+	vector<int> index;
+	for (auto &i : index1) {
+		if (find(index2.begin(), index2.end(), i) != index2.end())
+			index.push_back(i);
+	}
+	stable_sort(index.begin(), index.end());
+	//
+	vector<Mat> temp1, temp2;
+	int r1 = 0, r2 = 0, c1 = 0, c2 = 0;
+	for (auto i : index) {
+		temp1.push_back(*(data1.begin() + i));
+		temp2.push_back(*(data2.begin() + i));
+		r1 += (*(data1.begin() + i)).rows;
+		c1 += (*(data1.begin() + i)).cols;
+		r2 += (*(data2.begin() + i)).rows;
+		c2 += (*(data2.begin() + i)).cols;
+	}
+	data1 = temp1;
+	data2 = temp2;
+	r1 = (int)round((float)r1 / (float)index.size());
+	c1 = (int)round((float)c1 / (float)index.size());
+	r2 = (int)round((float)r2 / (float)index.size());
+	c2 = (int)round((float)c2 / (float)index.size());
+	for (auto &i : data1) {
+		resize(i, i, Size(r1, c1), INTER_LINEAR);
+	}
+	//for (auto &i : data2) {
+	//	resize(i, i, Size(r1, c1), INTER_LINEAR);
+	//}
+	int x = 0;
+	for (auto &i : index) {
+		x += *(point_x.begin() + i);
+	}
+	x = (int)round((float)x / (float)index.size());
+	vector<float> score1, score2;
+	for (int i = 0; i < im.rows; ++i)
+		if (i > round(r1 / 2) + 2 && i < im.rows - round(r1 / 2) - 2) {
+			Mat temp1, temp2;
+			temp1 = im(Range(i - (int)round(r1 / 2.0), i + (int)round(r1 / 2.0) + 1), Range(0, x)).clone();
+			temp2 = im(Range(i - (int)round(r1 / 2.0), i + (int)round(r1 / 2.0) + 1), Range(x, im.cols)).clone();
+			flip(temp2, temp2, -1);
+			float temp;
+			temp = corr_data(temp1, data1);
+			score1.push_back(temp);
+			temp = corr_data(temp2, data1);
+			score2.push_back(temp);
+		}
+		else {
+			score1.push_back((float)-3);
+			score2.push_back((float)-3);
+		}
+		get_e_location(im, score1, score2, (float)r1, (float)0.4, x);
+
+		return;
+}
+
+vector<vector<float>> get_e_location(Mat im, vector<float> score1, vector<float> score2, float distance_t, float score_t, int x)
+{
+	vector<vector<float>>  result;
+	int y = -1;
+	float score = -4.0;
+	for (int i = 0; i < im.rows; ++i) {
+		if (score < score1[i]) {
+			score = score1[i];
+			y = i;
+		}
+	}
+	if (score < score_t) {
+		return vector<vector<float>>();
+	}
+	vector<float> temp_result;
+	temp_result.push_back((float)x);
+	temp_result.push_back((float)y);
+	temp_result.push_back((float)1);
+	temp_result.push_back((float)score);
+	result.push_back(temp_result);
+	// 寻找上方的E
+	while (1) {
+		int temp_yo = 0, temp_y1 = 0, temp_y2 = 0;
+		temp_yo = (int)(*result.begin())[1];
+		float temp_score1 = -3, temp_score2 = -3;
+		int y1, y2;
+		y1 = (int)floor(temp_yo - 2.5*distance_t);
+		y2 = (int)ceil(temp_yo - 1.5*distance_t);
+		if ((y1 < 0) && (y2 < 0))
+			break;
+		else if (y1 < 0)
+			y1 = 0;
+		vector<float> temp1(score1.begin() + y1, score1.begin() + y2 + 1);
+		for (int i = 0; i < temp1.size(); ++i) {
+			if (temp_score1 < temp1[i]) {
+				temp_score1 = temp1[i];
+				temp_y1 = i;
+			}
+		}
+		temp_y1 = temp_y1 + y1;
+
+		vector<float> temp2(score2.begin() + temp_y1, score2.begin() + temp_yo + 1);
+		for (int i = 0; i < temp2.size(); ++i) {
+			if (temp_score2 < temp2[i]) {
+				temp_score2 = temp2[i];
+				temp_y2 = i;
+			}
+		}
+		temp_y2 = temp_y1 + temp_y2;
+		if ((temp_score1 < score_t) && (temp_score2 < score_t))
+			continue;
+		if ((temp_score1 > score_t) && (temp_score2 > score_t) && abs(temp_y1 + temp_y2 - 2 * temp_yo) < 10) {
+			temp_result[0] = (float)x; temp_result[1] = (float)temp_y2;
+			temp_result[2] = (float)-1; temp_result[3] = (float)temp_score2;
+			result.insert(result.begin(), temp_result);
+			temp_result[0] = (float)x; temp_result[1] = (float)temp_y1;
+			temp_result[2] = (float)1; temp_result[3] = (float)temp_score1;
+			result.insert(result.begin(), temp_result);
+			continue;
+		}
+		if (temp_score1 > score_t) {
+			int temp_y = int(round((temp_y1 + temp_yo) / 2));
+			float temp_score = score2[temp_y];
+			if ((temp_score > score_t) && abs(temp_y - temp_yo) > 0.8*distance_t) {
+				temp_y2 = temp_y;
+				temp_score2 = temp_score;
+				temp_result[0] = (float)x; temp_result[1] = (float)temp_y2;
+				temp_result[2] = (float)-1; temp_result[3] = (float)temp_score2;
+				result.insert(result.begin(), temp_result);
+				temp_result[0] = (float)x; temp_result[1] = (float)temp_y1;
+				temp_result[2] = (float)1; temp_result[3] = (float)temp_score1;
+				result.insert(result.begin(), temp_result);
+				continue;
+			}
+		}
+		if (temp_score2 > score_t) {
+			int temp_y = 2*temp_y2 -temp_yo;
+			float temp_score = score1[temp_y];
+			if ((temp_score > score_t) && abs(temp_y - temp_yo) <2.5*distance_t) {
+				temp_y1 = temp_y;
+				temp_score1 = temp_score;
+				temp_result[0] = (float)x; temp_result[1] = (float)temp_y2;
+				temp_result[2] = (float)-1; temp_result[3] = (float)temp_score2;
+				result.insert(result.begin(), temp_result);
+				temp_result[0] = (float)x; temp_result[1] = (float)temp_y1;
+				temp_result[2] = (float)1; temp_result[3] = (float)temp_score1;
+				result.insert(result.begin(), temp_result);
+				continue;
+			}
+		}
+	}
+	// 寻找下方的E
+
+	return vector<vector<float>>();
+}
+
+float corr_data(Mat im, vector<Mat> data)
+{
+	float score = -2;
+	Mat temp = im.clone(), result;
+	resize(temp, temp, data[0].size(), CV_INTER_LINEAR);
+	for (auto &i : data) {
+		matchTemplate(temp, i, result, CV_TM_CCOEFF_NORMED);
+		score = score > result.at<float>(0, 0) ? score : result.at<float>(0, 0);
+	}
+	return score;
+}
+
+vector<int> class_score(Mat corr_matrix, float score_t)
+{
+	vector<int> index;
+	Point maxloc;
+	double maxval = 0;
+	minMaxLoc(corr_matrix, NULL, &maxval, NULL, &maxloc);
+	Mat temp;
+	int temp_index = maxloc.x;
+	float score = (float)maxval;
+	while (1) {
+		if (score < score_t) {
+			break;
+		}
+		else {
+			index.push_back(temp_index);
+			temp = corr_matrix.row(temp_index).clone();
+			temp.at<float>(0, temp_index) = -9;
+			corr_matrix.row(temp_index).setTo(-9);
+			corr_matrix.col(temp_index).setTo(-9);
+			score = -1;
+			for (int i = 0; i < temp.cols; ++i) {
+				if (score < temp.at<float>(0, i)) {
+					score = temp.at<float>(0, i);
+					temp_index = i;
+				}
+			}
+		}
+	}
+	return index;
 }
 
 vector<int> sub2ind(Mat m, vector<Point2i> point)

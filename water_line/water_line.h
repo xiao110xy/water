@@ -36,6 +36,9 @@ vector<vector<Point2i>> compute_point(Mat I, Mat location);
 vector<Point2i> localmax_point(Mat score_image, float d_t,float scale);
 vector<Mat> get_e_points(Mat im, vector<vector<Point2i>> points);
 void get_e_area(Mat im, vector<Mat> points);
+vector<vector<float>> get_e_location(Mat im, vector<float> score1, vector<float> score2, float distance_t, float score_t, int x);
+float corr_data(Mat im, vector<Mat> data);
+vector<int> class_score(Mat corr_matrix, float score_t);
 
 vector<int> sub2ind(Mat m, vector<Point2f> point);
 vector<Point2i> ind2sub(Mat m, vector<int> ind);
