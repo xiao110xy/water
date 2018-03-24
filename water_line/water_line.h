@@ -44,8 +44,13 @@ vector<vector<float>> get_e_location(Mat im, vector<float> score1, vector<float>
 float corr_data(Mat im, vector<Mat> data);
 vector<int> class_score(Mat corr_matrix, float score_t);
 
-vector<vector<float>> number_recgnition(Mat data, vector<vector<Mat>> &model);
+vector<vector<float>> number_area_recognition(Mat data, vector<vector<float>> points,vector<vector<Mat>> &model);
+vector<float> number_recognition(Mat data,vector<vector<Mat>> model);
+vector<vector<float>> better_number_rec(vector<vector<float>> number,vector<vector<float>> points);
 vector<string> getFiles(string folder, string firstname, string lastname);
+
+vector<float> get_water_line(Mat data, vector<vector<float>> points, vector<vector<float>> number);
+
 
 vector<int> sub2ind(Mat m, vector<Point2f> point);
 vector<Point2i> ind2sub(Mat m, vector<int> ind);

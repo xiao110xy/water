@@ -627,7 +627,9 @@ float segement_area(Mat I, vector<Matx<float, 12, 1>> parallel_lines, vector<vec
 		vector<vector<float>> points = compute_e_point(data, location);
 		data = data(Range(0, data.rows), Range(location.at<int>(0, 0), location.at<int>(0, 1) + 1));
 		//Mat temp_im = draw_point(data, points);
-		vector<vector<float>> number = number_recgnition(data,model);
+		vector<vector<float>> number = number_area_recognition(data,points,model);
+		// 得出水线
+		vector<float> water = get_water_line(data,points, number);
 		return 0.0f;
 	}
 	return 0.0f;
@@ -1221,12 +1223,182 @@ vector<int> class_score(Mat corr_matrix, float score_t)
 	return index;
 }
 
-
-vector<vector<float>> number_recgnition(Mat data, vector<vector<Mat>> &model)
+vector<vector<float>> number_area_recognition(Mat data, vector<vector<float>> points, vector<vector<Mat>>& model)
 {
-
-	return vector<vector<float>>();
+	vector<vector<float>> number;
+	for (auto i = points.begin(); i != points.end();++i) {
+		vector<float> temp_result{ -1,-1 };
+		if ((*i)[2] == 1) {
+			number.push_back(temp_result);
+			continue;
+		}
+		int x,y1, y2;
+		x = (int)((*i)[0]);
+		y1 = (int)round(((*(i-1))[1]+ (*i)[1])/2.0);
+		y2 = (int)round((3* (*i)[1] - (*(i - 1))[1])/2.0);
+		Mat temp_im = data(Range(y1, y2 + 1), Range(0, x + 1));
+		temp_result = number_recognition(temp_im, model);
+		if (temp_result[0] < 0.5) {
+			number.push_back(vector<float>{-1, -1});
+			continue;
+		}
+		number.push_back(temp_result);
+	}
+	vector<vector<float>> new_number = better_number_rec(number, points);
+	return number;
 }
+
+vector<float> number_recognition(Mat data, vector<vector<Mat>> model)
+{
+	//
+	Mat gray_image, logitic_image;
+	cvtColor(data, gray_image, CV_BGR2GRAY);
+	gray_image = 255 - gray_image;
+	Mat im;
+	im = gray_image.clone();
+	resize(im, im, Size(24, 48), INTER_LINEAR);
+	im.convertTo(im, CV_32F);
+	normalize(im, im, 1.0, 0.0, NORM_MINMAX);
+	//
+	threshold(gray_image, logitic_image, 0, 255, THRESH_BINARY | THRESH_OTSU);
+	int n_label = connectedComponents(logitic_image, logitic_image, 4);
+	logitic_image.convertTo(logitic_image, CV_8U);
+	int n_pixel_t =-99;
+	Mat temp_im;
+	for (int i = 1; i < n_label; ++i) {
+		Mat temp = logitic_image.clone();
+		temp.convertTo(temp, CV_8U);
+		uchar* data1 = temp.ptr<uchar>(0);
+		uchar* data2 = logitic_image.ptr<uchar>(0);
+		int n_pixel=0;
+		for (int j = 0; j < temp.total(); ++j) {
+			*(data1 + j) = *(data2 + j) == i ? 1 : 0;
+			n_pixel += *(data1 + j);
+		}
+		if (n_pixel > n_pixel_t) {
+			temp_im = temp.clone();
+			n_pixel_t = n_pixel;
+		}
+	}
+	Mat colSumVec, rowSumVec;
+	reduce(temp_im, rowSumVec, 1, CV_REDUCE_SUM, CV_32S); // sum(img, 2)
+	reduce(temp_im, colSumVec, 0, CV_REDUCE_SUM, CV_32S); // sum(img, 1)
+	int r1 = 0, r2 = data.rows-1, c1 = 0, c2 = data.cols-1;
+	// 行
+	for (int j = 0; j < data.rows-1; ++j) {
+		if ((rowSumVec.at<int>(j, 0) == 0) && (rowSumVec.at<int>(j + 1,0) != 0)) {
+			r1 = j;
+			break;
+		}
+	}
+	for (int j = data.rows - 1; j >0; --j) {
+		if ((rowSumVec.at<int>(j, 0) == 0) && (rowSumVec.at<int>(j - 1,0 ) != 0)) {
+			r2 = j;
+			break;
+		}
+	}
+	// 列
+	for (int j = 0; j < data.cols - 1; ++j) {
+		if ((colSumVec.at<int>(0,j) == 0) && (colSumVec.at<int>(0, j+1) != 0)) {
+			c1 = j;
+			break;
+		}
+	}
+	for (int j = data.cols - 1; j >0; --j) {
+		if ((colSumVec.at<int>(0,j) == 0) && (colSumVec.at<int>(0, j-1) != 0)) {
+			c2 = j;
+			break;
+		}
+	}
+	if ((r2 - r1 + 1)*(c2 - c1 + 1) > temp_im.total()/3) {
+		im = gray_image(Range(r1, r2 + 1), Range(c1, c2 + 1)).clone();
+		resize(im, im, Size(24, 48), INTER_LINEAR);
+		im.convertTo(im, CV_32F);
+		normalize(im, im, 1.0, 0.0, NORM_MINMAX);
+	}
+			
+	vector<vector<float>> scores;
+	vector<float> score(2,-1);
+	for (int i = 0; i < model.size();++i) {
+		float temp_score = -1;
+		for (auto &j :model[i]) {
+			Mat temp;
+			matchTemplate(im,j,temp, CV_TM_CCOEFF_NORMED);
+			temp_score = temp.at<float>(0, 0)>temp_score ? temp.at<float>(0, 0): temp_score;
+		}
+		vector<float> temp(2,-1);
+		temp[0] = (float)i; temp[1] = temp_score;
+		scores.push_back(temp);
+		if (temp_score > score[1]) {
+			score = temp;
+		}
+	}
+	return score;
+}
+
+vector<vector<float>> better_number_rec(vector<vector<float>> number, vector<vector<float>> points)
+{
+	int n=0;
+	vector<vector<float>> temp1, temp2;
+	for (int i = 0; i < points.size();++i) {
+		if ((*(points.begin() + i))[2] > 0)
+			continue;
+		else {
+			temp1.push_back(*(number.begin() + i));
+			temp2.push_back(*(points.begin() + i));
+			n += 1;
+		}
+	}
+	Mat scores= Mat::zeros(Size(10, n), CV_32F);
+	for (int i = 0; i < n; ++i) {
+		if ((*(temp1.begin() + i))[0] < 0)
+			continue;
+		for (int j = 0; j < n; ++j) {
+			int index = (int)(*(temp1.begin() + i))[0] + i - j;
+			index = index % 10;
+			scores.at<float>(j, index) += (*(temp1.begin() + i))[1];
+		}
+	}
+	for (int i = 0; i < n; ++i){
+		int index = -1; float score = -1;
+		for (int j = 0; j < 10; ++j) {
+			float temp = scores.at<float>(i, j);
+			if (temp > score) {
+				index = j;
+				score = temp;
+			}
+		}
+		(*(temp1.begin() + i))[0] = (float)index+(float)0.25;
+		(*(temp1.begin() + i))[1] = score;
+		if (index == 0) {
+			for (int j = 0; j < i; ++j) {
+				(*(temp1.begin() + i))[0] += 10;
+			}
+		}
+	}
+	vector<vector<float>> new_number = number;
+	int index = 0;;
+	for (int i = 0; i < new_number.size(); ++i) {
+		if ((*(points.begin() + i))[2] > 0)
+			continue;
+		if (index == n)
+			break;
+		(*(new_number.begin() + i))[0] = (*(temp1.begin() + index))[0];
+		(*(new_number.begin() + i))[1] = (*(temp1.begin() + index))[1];
+		index += 1;
+	}
+	for (int i = 0; i < new_number.size(); ++i) {
+		if ((*(points.begin() + i))[2] < 0)
+			continue;
+		if (i<new_number.size()-1)
+			(*(new_number.begin() + i))[0] = (*(new_number.begin() + i+1))[0]+(float)0.5;
+		else
+			(*(new_number.begin() + i))[0] = (*(new_number.begin() + i-1))[0]+ (float)0.5;
+	}
+	return new_number;
+}
+
+
 
 vector<string> getFiles(string folder, string firstname, string lastname)
 {
@@ -1258,6 +1430,36 @@ vector<string> getFiles(string folder, string firstname, string lastname)
 		_findclose(hFile);
 	}
 	return files;
+}
+vector<float> get_water_line(Mat data, vector<vector<float>> points, vector<vector<float>> number)
+{
+	// k-means cluster
+	int h_w_size = 0;
+	if (points.size() > 3)
+		for (int i = 0; i < points.size() - 3; ++i) {
+			h_w_size += (*(points.begin() + i))[1] * (*(points.begin() + i))[2] + (*(points.begin() + i + 2))[1] * (*(points.begin() + i + 2))[2];
+		}
+	else
+		h_w_size = data.cols / 4;
+	h_w_size = h_w_size / 2;
+	vector<Point3f> samples;
+	for (int i = 0; i < points.size(); ++i) {
+		if (((i == 1) || (i == points.size() - 1)) && points.size() > 3)
+			continue;
+		int r1 = 0, r2 = 0, c1 = 0,c2 = 0;
+		if ((*(points.begin() + i))[2] > 0) {
+
+			Mat temp = data()
+		}
+		if ((*(points.begin() + i))[2] < 0) {
+
+		}
+	}
+
+
+
+	
+	return vector<float>();
 }
 vector<int> sub2ind(Mat m, vector<Point2i> point)
 {
