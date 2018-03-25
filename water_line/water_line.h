@@ -7,7 +7,13 @@
 #include <string>
 #include <list>
 #include <io.h>
-
+struct water_result {
+	Mat data;
+	vector<vector<float>> points;
+	vector<vector<float>> number;
+	int water_line;
+	float water_number;
+};
 class water_line
 {
 public:
@@ -31,9 +37,11 @@ vector<Matx<float, 6, 1>> judge_line(Matx<float, 6, 1> line, vector<Matx<float, 
 vector<Matx<float, 6, 1>> intersect_line(vector<Matx<float, 6, 1>> lines1, vector<Matx<float, 6, 1>> lines2);
 bool pnpoly(int nvert, float *vertx, float *verty, float testx, float testy);
 
-float segement_area(Mat I, vector<Matx<float, 12, 1>> parallel_lines, vector<vector<Mat>> &model);
+vector<water_result> segement_area(Mat I, vector<vector<Mat>> &model);
+vector<Matx<float, 12, 1>>  extend_line(Mat I, vector<Matx<float, 12, 1>> parallel_lines);
+vector<Matx<float, 12, 1>>  subtract_iou(Mat I,vector<Matx<float, 12, 1>> parallel_lines);
 Mat sub_water_area(Mat I,Mat &line1,Mat &line2);
-vector<Matx<float, 6, 1>> select_v_lines(Mat I, vector<Matx<float, 6, 1>> lines1, vector<Matx<float, 6, 1>> lines2);
+vector<Matx<float, 6, 1>> select_h_lines(Mat I, vector<Matx<float, 6, 1>> lines1, vector<Matx<float, 6, 1>> lines2);
 Mat get_e_boundary(Mat I, vector<Matx<float, 6, 1>> lines);
 
 vector<vector<float>> compute_e_point(Mat I, Mat location);
@@ -51,6 +59,7 @@ vector<string> getFiles(string folder, string firstname, string lastname);
 
 vector<float> get_water_line(Mat data, vector<vector<float>> points, vector<vector<float>> number);
 
-
 vector<int> sub2ind(Mat m, vector<Point2f> point);
 vector<Point2i> ind2sub(Mat m, vector<int> ind);
+
+void svaefile(string image_name, vector<water_result> water);
