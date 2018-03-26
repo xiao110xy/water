@@ -21,7 +21,9 @@ public:
 	~water_line();
 };
 Mat draw_line(Mat data,vector<Matx<float, 6, 1>> lines);
+Mat draw_line(Mat data,vector<Matx<float, 6, 1>> lines,Scalar rgb);
 Mat draw_line(Mat data, vector<Matx<float, 12, 1>> lines);
+Mat draw_line(Mat data, vector<Matx<float, 12, 1>> lines,vector<Scalar> rgb);
 
 Mat draw_point(Mat data, vector<Point2i> points, Scalar rgb);
 Mat draw_point(Mat data, vector<Mat> points);
@@ -32,6 +34,8 @@ void get_line(Mat image,vector<Matx<float, 6, 1>> &lines1, vector<Matx<float, 6,
 
 vector<Matx<float, 12, 1>> get_parallel_lines(Mat image, vector<Matx<float, 6, 1>> lines1, vector<Matx<float, 6, 1>> lines2);
 vector<Matx<float, 6, 1>> merge_line(Matx<float, 6, 1> line, vector<Matx<float, 6, 1>> lines, vector<Matx<float, 6, 1>> &data, float angle_t, float d_v_t, float d_p_t);
+// Bresenham's line algorithm
+vector<Point> get_line_point(Point2f point1, Point2f point2); 
 vector<Matx<float, 7, 1>> project_line(Matx<float, 6, 1> line, vector<Matx<float, 6, 1>> lines);
 vector<Matx<float, 6, 1>> judge_line(Matx<float, 6, 1> line, vector<Matx<float, 6, 1>> lines, vector<Matx<float, 6, 1>> lines2);
 vector<Matx<float, 6, 1>> intersect_line(vector<Matx<float, 6, 1>> lines1, vector<Matx<float, 6, 1>> lines2);
@@ -50,7 +54,7 @@ vector<Mat> get_e_proposal_points(Mat im, vector<vector<Point2i>> points);
 vector<vector<float>> better_e_points(Mat im, vector<Mat> points);
 vector<vector<float>> get_e_location(Mat im, vector<float> score1, vector<float> score2, float distance_t, float score_t, int x);
 float corr_data(Mat im, vector<Mat> data);
-vector<int> class_score(Mat corr_matrix, float score_t);
+vector<int> class_score(Mat corr_matrix, float scale);
 
 vector<vector<float>> number_area_recognition(Mat data, vector<vector<float>> points,vector<vector<Mat>> &model);
 vector<float> number_recognition(Mat data,vector<vector<Mat>> model);
@@ -63,3 +67,6 @@ vector<int> sub2ind(Mat m, vector<Point2f> point);
 vector<Point2i> ind2sub(Mat m, vector<int> ind);
 
 void svaefile(string image_name, vector<water_result> water);
+
+
+
