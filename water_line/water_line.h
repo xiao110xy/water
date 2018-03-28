@@ -61,7 +61,7 @@ vector<float> number_recognition(Mat data,vector<vector<Mat>> model);
 vector<vector<float>> better_number_rec(vector<vector<float>> number,vector<vector<float>> points);
 vector<string> getFiles(string folder, string firstname, string lastname);
 
-vector<float> get_water_line(Mat data, vector<vector<float>> points, vector<vector<float>> number);
+float get_water_line(Mat data, vector<vector<float>> points);
 vector<vector<float>> select_e_area_by_line(Mat im, vector<Matx<float, 6, 1>> &lines1, vector<Matx<float, 6, 1>> &lines2,float distance);
 vector<vector<float>> cluster_v_line(vector<Matx<float, 6, 1>> &lines, vector<vector<Matx<float, 6, 1>>> &result, float distance);
 

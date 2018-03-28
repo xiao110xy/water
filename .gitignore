@@ -9,3 +9,7 @@ x64
 water_line/Debug
 water_line/Release
 water_line/x64
+#
+enc_temp_folder
+#
+*.png
