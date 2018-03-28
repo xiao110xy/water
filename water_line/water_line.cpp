@@ -1513,8 +1513,8 @@ vector<int> class_score(Mat corr_matrix, float scale)
 	Mat temp;
 	int temp_index = maxloc.x;
 	float score = (float)maxval;
-	float score_t = scale * maxval > (float)0.1 ? scale * maxval : (float)0.1;
-	score_t = score_t > 0.4 ? score_t : 0.4;
+	float score_t = scale *(float)maxval > (float)0.1 ? (float)scale * (float)maxval : (float)0.1;
+	score_t = score_t > (float)0.4 ? score_t : (float)0.4;
 	while (1) {
 		if (score < score_t) {
 			break;
@@ -1759,114 +1759,96 @@ vector<string> getFiles(string folder, string firstname, string lastname)
 vector<float>  get_water_line(Mat data, vector<vector<float>> points, vector<vector<float>> number)
 {
 	Mat test_im;
-	vector<float> result;
-	// k-means cluster
-	int h_w_size = 0;
-	if (points.size() > 3) {
-		int i; float temp = 0;
-		for (i = 0; i < points.size() - 3; ++++i) {
-			temp += (*(points.begin() + i))[1] * (*(points.begin() + i))[2] + (*(points.begin() + i + 1))[1] * (*(points.begin() + i + 1))[2];
-		}
-		h_w_size = (int)abs(temp) / i;
-	}
-	else
-		h_w_size = data.cols / 4;
-	h_w_size = h_w_size / 2;
-	vector<Point3f> samples;
-	for (int i = 0; i < points.size(); ++i) {
-		if (((i == 1) || (i == points.size() - 1)) && points.size() > 3)
-			continue;
-		int r1 = 0, r2 = 0, c1 = 0, c2 = 0;
-		if ((*(points.begin() + i))[2] > 0) {
-			r1 = (int)round((*(points.begin() + i))[1] - h_w_size);
-			r2 = (int)round((*(points.begin() + i))[1] + h_w_size);
-			c1 = (int)round((*(points.begin() + i))[0] - 2.0*h_w_size);
-			c2 = (int)round((*(points.begin() + i))[0]);
-			Mat temp = data(Range(r1, r2 + 1), Range(c1, c2 + 1));
-			temp.convertTo(temp, CV_32F);
-			vector<Point3f> sample;
-			temp.reshape(3, temp.rows*temp.cols).copyTo(sample);
-			samples.insert(samples.end(), sample.begin(), sample.end());
-		}
-		if ((*(points.begin() + i))[2] < 0) {
-			r1 = (int)round((*(points.begin() + i))[1] - h_w_size);
-			r2 = (int)round((*(points.begin() + i))[1] + h_w_size);
-			c1 = (int)round((*(points.begin() + i))[0]);
-			c2 = (int)round((*(points.begin() + i))[0] + 2.0*h_w_size);
-			Mat temp = data(Range(r1, r2 + 1), Range(c1, c2 + 1));
-			temp.convertTo(temp, CV_32F);
-			vector<Point3f> sample;
-			temp.reshape(3, temp.rows*temp.cols).copyTo(sample);
-			samples.insert(samples.end(), sample.begin(), sample.end());
-		}
-	}
-	Mat sample_image = Mat(samples).reshape(1, (int)samples.size());
-	Mat labels, centers;
-	kmeans(sample_image, 2, labels, TermCriteria(CV_TERMCRIT_EPS + CV_TERMCRIT_ITER, 10, 1.0), 3, KMEANS_PP_CENTERS, centers);
-	if (sum(centers.row(0))[0] > sum(centers.row(1))[0]) {
-		Mat temp = centers.row(0).clone();
-		centers.row(1).copyTo(centers.row(0));
-		temp.copyTo(centers.row(1));
-	}
-	Mat temp;
-	Mat distance1, distance2;
-	centers.row(0).copyTo(temp);
-	temp = repeat(temp, sample_image.rows, 1);
-	distance1 = sample_image - temp;
-	distance1 = distance1.mul(distance1);
-	reduce(distance1, distance1, 1, CV_REDUCE_SUM);
-	sqrt(distance1, distance1);
-	centers.row(1).copyTo(temp);
-	temp = repeat(temp, sample_image.rows, 1);
-	distance2 = sample_image - temp;
-	distance2 = distance2.mul(distance2);
-	reduce(distance2, distance2, 1, CV_REDUCE_SUM);
-	sqrt(distance2, distance2);
-	float distance_t = 0;
-	for (int i = 0; i < distance1.rows; ++i) {
-		distance_t += distance1.at<float>(i, 0) < distance2.at<float>(i, 0) ? distance1.at<float>(i, 0) : distance2.at<float>(i, 0);;
-	}
-	distance_t = distance_t / (float)distance1.rows;
-	// 对整幅图像进行处理，求出水面线
-	data.convertTo(temp, CV_32F);
-	temp.reshape(1, temp.rows*temp.cols).copyTo(temp);
-	distance1 = temp - repeat(centers.row(0).clone(), temp.rows, 1);
-	distance1 = distance1.mul(distance1);
-	reduce(distance1, distance1, 1, CV_REDUCE_SUM);
-	sqrt(distance1, distance1);
-	distance2 = temp - repeat(centers.row(1).clone(), temp.rows, 1);
-	distance2 = distance2.mul(distance2);
-	reduce(distance2, distance2, 1, CV_REDUCE_SUM);
-	sqrt(distance2, distance2);
-	Mat distance(data.size(), CV_8U, Scalar(0));
-	Mat score(Size(2, distance.rows), CV_32S);
-	distance.setTo(0);
-	for (int i = 0; i < distance1.rows; ++i) {
-		bool flag = (*(distance2.ptr<float>(0) + i) > *(distance1.ptr<float>(0) + i)) && (*(distance1.ptr<float>(0) + i) < 1.5*distance_t);
-		if (flag)
-			*(distance.ptr<uchar>(0) + i) = 1;
-	}
-	reduce(distance, score.col(0), 1, CV_REDUCE_SUM, CV_32S);
-	distance.setTo(0);
-	for (int i = 0; i < distance1.rows; ++i) {
-		bool flag = (*(distance2.ptr<float>(0) + i) < *(distance1.ptr<float>(0) + i)) && (*(distance2.ptr<float>(0) + i) < 1.5*distance_t);
-		if (flag)
-			*(distance.ptr<uchar>(0) + i) = 1;
-	}
-	reduce(distance, score.col(1), 1, CV_REDUCE_SUM, CV_32S);
-	int y = 0;
+	int index = data.rows - 1;
 	if (points.size() < 3)
-		y = (int)(points[0])[1];
+		index = (int)(*(points.end() - 1))[1];
 	else
-		y = (int)(*(points.end() - 2))[1];
-	score(Range(0, y + 1), Range(0, score.cols)).setTo(0);
-	int water_line = score.rows - 1;
-	float scale = (float)0.35;
-	for (int i = y; i < score.rows; ++i)
-		if ((score.at<int>(i, 0) > scale*data.cols) && (score.at<int>(i, 1) > scale*data.cols)) {
-			water_line = i;
+		index = (int)(*(points.end() - 2))[1];
+	//
+	Mat im = data.clone();
+	float scale = (float)100.0 / (float)data.cols;
+	resize(data, im, Size(100, data.rows));
+	vector<Matx<float, 6, 1>> temp_lines, lines;
+	get_line(im, temp_lines, lines);
+	// 小于10的线去除
+	for (int i = 0; i < lines.size(); ++i) {
+		if (lines[i].val[5] < 25) {
+			lines.erase(lines.begin() + i, lines.end());
+			break;
 		}
-	result.push_back((float)water_line);
+	}
+	test_im = im.clone();
+	test_im = draw_line(test_im, lines, Scalar(0, 255, 0));
+	// 左右两侧的直线
+	vector<Matx<float, 6, 1>> lines1, lines2;
+	vector<float> location(3, 0);
+	for (auto &i : lines) {
+		float xo, x1, x2;
+		x1 = i.val[0]; x2 = i.val[2]; xo = (x1 + x2) / 2;
+		if (x2 < 75 && x1 < 50) {
+			lines1.push_back(i);
+			continue;
+		}
+		if (x2 > 75 && x1 > 50) {
+			lines2.push_back(i);
+			continue;
+		}
+		int n1 = 0, n2 = 0;
+		vector<Point> points = get_line_point(Point2f(i.val[0], i.val[1]), Point2f(i.val[2], i.val[3]));
+		for (auto &j : points) {
+			n1 += j.x < 40 ? 1 : 0;
+			n2 += j.x > 60 ? 1 : 0;
+		}
+		if (n1 > n2)
+			lines1.push_back(i);
+		else
+			lines2.push_back(i);
+	}
+
+	test_im = im.clone();
+	test_im = draw_line(test_im, lines1, Scalar(255, 0, 0));
+	test_im = draw_line(test_im, lines2, Scalar(0, 0, 255));
+	stable_sort(lines1.begin(), lines1.end(),
+		[](const Matx<float, 6, 1>&a, const Matx<float, 6, 1>&b) {return a.val[1] < b.val[1]; });
+	stable_sort(lines2.begin(), lines2.end(),
+		[](const Matx<float, 6, 1>&a, const Matx<float, 6, 1>&b) {return a.val[1] < b.val[1]; });
+	vector<vector<Matx<float, 6, 1>>> result,result1, result2;
+	cluster_v_line(lines1, result1, (float)data.cols);
+	cluster_v_line(lines2, result2, (float)data.cols);
+	lines = lines1;
+	lines.insert(lines.end(), lines1.begin(), lines1.end());
+	result = result1;
+	result.insert(result.end(), result2.begin(), result2.end());
+	stable_sort(result.begin(), result.end(),
+		[](vector<Matx<float, 6, 1>> a, vector<Matx<float, 6, 1>> b) {return a[0].val[1] < b[0].val[1]; });
+	int n = 0;
+	result1 = result;
+	for (int i = 0; i < result1.size()-1; ++i) {
+		vector<vector<Matx<float, 6, 1>>> temp;
+		temp.push_back(result1[i]);
+		float y = (result1[i])[result1[i].size() - 1].val[1] > (result1[i])[result1[i].size() - 1].val[3] ? (result1[i])[result1[i].size() - 1].val[1] : (result1[i])[result1[i].size() - 1].val[3];
+		for (int j = i+1; j < result1.size(); ++j) {
+			if ((result1[j])[0].val[1] < y + data.cols / 6 || (result1[j])[0].val[3] < y + data.cols / 6) {
+				temp.push_back(result1[j]);
+				y = (result1[j])[result1[j].size() - 1].val[1] > (result1[j])[result1[j].size() - 1].val[3] ? (result1[j])[result1[j].size() - 1].val[1] : (result1[j])[result1[j].size() - 1].val[3];
+			}
+			else {
+				i = j;
+				break;
+			}
+		}
+		if (temp.size() > n) {
+			n = (int)temp.size();
+			result2 = temp;
+		}
+	}
+	float water_line;
+	if (result2.size() != 0)
+		water_line = (result2[result2.size() - 1])[(result2[result2.size() - 1]).size() - 1].val[1] > (result2[result2.size() - 1])[(result2[result2.size() - 1]).size() - 1].val[3] ?
+						(result2[result2.size() - 1])[(result2[result2.size() - 1]).size() - 1].val[1] : (result2[result2.size() - 1])[(result2[result2.size() - 1]).size() - 1].val[3];
+	else
+		water_line = (float)index;
+
 	// 计算刻度
 	vector<float> temp_water;
 	vector<float> temp_p;
@@ -1886,8 +1868,61 @@ vector<float>  get_water_line(Mat data, vector<vector<float>> points, vector<vec
 		water_number += temp / (water_line - x1);
 	}
 	water_number = water_number / p;
-	result.push_back(water_number);
-	return result;
+	//
+	vector<float> water;
+	water.push_back((float)water_line);
+	water.push_back(water_number);
+	return water;
+}
+vector<vector<float>> select_e_area_by_line(Mat im, vector<Matx<float, 6, 1>> &lines1, vector<Matx<float, 6, 1>> &lines2, float distance)
+{
+	Mat test_im;
+	test_im = im.clone();
+	test_im = draw_line(test_im, lines2, Scalar(255, 0, 0));
+	// 排序 由上往下
+
+
+
+	return vector<vector<float>>();
+}
+vector<vector<float>> cluster_v_line(vector<Matx<float, 6, 1>>& lines, vector<vector<Matx<float, 6, 1>>>& result, float distance)
+{
+	float distance_t = 0;
+	distance_t = distance / 3;
+	Matx<float, 6, 1> line;
+	vector<vector<float>> result_points;
+	while (lines.size()>0) {
+		line = *lines.begin();//从最长开始
+		lines.erase(lines.begin());
+		vector<Matx<float, 6, 1>> temp_lines, temp;// 与它差不多的直线
+		temp_lines.push_back(line);
+		for (auto &i : lines) {
+			float angle = (line.val[4] < 90 ? line.val[4] + 90 : line.val[4] - 90) - (i.val[4] < 90 ? i.val[4] + 90 : i.val[4] - 90);
+			if (abs(i.val[1] - (*(temp_lines.end() - 1)).val[1]) < distance_t&&abs(i.val[3] - (*(temp_lines.end() - 1)).val[3]) < distance_t&&abs(angle)<5)
+				temp_lines.push_back(i);
+			else
+				temp.push_back(i);
+		}
+		if (temp_lines.size() > 7) {
+			lines.insert(lines.begin(), line);
+			distance_t = distance_t - 2;
+		}
+		else {
+			result.push_back(temp_lines);
+			lines = temp;
+			distance_t = distance / 3;
+		}
+	}
+	vector<vector<Matx<float, 6, 1>>> temp;
+	lines.clear();
+	for (auto &i : result) {
+		if (i.size() < 3)
+			lines.insert(lines.end(), i.begin(), i.end());
+		else
+			temp.push_back(i);
+	}
+	result = temp;
+	return vector<vector<float>>();
 }
 vector<int> sub2ind(Mat m, vector<Point2i> point)
 {

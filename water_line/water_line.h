@@ -62,6 +62,8 @@ vector<vector<float>> better_number_rec(vector<vector<float>> number,vector<vect
 vector<string> getFiles(string folder, string firstname, string lastname);
 
 vector<float> get_water_line(Mat data, vector<vector<float>> points, vector<vector<float>> number);
+vector<vector<float>> select_e_area_by_line(Mat im, vector<Matx<float, 6, 1>> &lines1, vector<Matx<float, 6, 1>> &lines2,float distance);
+vector<vector<float>> cluster_v_line(vector<Matx<float, 6, 1>> &lines, vector<vector<Matx<float, 6, 1>>> &result, float distance);
 
 vector<int> sub2ind(Mat m, vector<Point2f> point);
 vector<Point2i> ind2sub(Mat m, vector<int> ind);

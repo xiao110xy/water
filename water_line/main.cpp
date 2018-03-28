@@ -10,7 +10,7 @@ int main(int argc, char** argv)
 {
 	vector<vector<Mat>> model;
 	DEBUG_IF(1) {
-		if (argc == 3){
+		if (argc == 3) {
 			string model_path(argv[2]);
 			for (int i = 0; i < 10; ++i) {
 				stringstream stream;
@@ -51,16 +51,16 @@ int main(int argc, char** argv)
 	else {
 		FileStorage fs("mat.xml", FileStorage::READ);
 		fs["model"] >> model;
-		if (model.size()==0)
+		if (model.size() == 0)
 		{
 			printf(" No model data \n ");
 			return -1;
 		}
 	}
 	// 读入图像
-	auto all_file = getFiles("D:/project/water/water_line", "", ".png");
+	auto all_file = getFiles("./", "", ".png");
 	//for (auto &image_name : all_file) {
-	string image_name = "47.png";
+	string image_name = "18.png";
 		Mat image = imread(image_name, IMREAD_COLOR);
 		if (!image.data)
 		{
