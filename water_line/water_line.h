@@ -25,6 +25,7 @@ Mat draw_line(Mat data,vector<Matx<float, 6, 1>> lines,Scalar rgb);
 Mat draw_line(Mat data, vector<Matx<float, 12, 1>> lines);
 Mat draw_line(Mat data, vector<Matx<float, 12, 1>> lines,vector<Scalar> rgb);
 
+Mat draw_point(Mat data, vector<Point3f> points, Scalar rgb);
 Mat draw_point(Mat data, vector<Point2i> points, Scalar rgb);
 Mat draw_point(Mat data, vector<Mat> points);
 Mat draw_point(Mat data, vector<vector<float>> points);
@@ -50,11 +51,12 @@ Mat get_e_boundary(Mat I, vector<Matx<float, 6, 1>> lines);
 
 vector<vector<float>> compute_e_point(Mat I, Mat location);
 vector<Point2i> localmax_point(Mat score_image, float d_t,float scale);
+vector<Point3f> localmax_point_score(Mat score_image, float d_t, float scale);
 vector<Mat> get_e_proposal_points(Mat im, vector<vector<Point2i>> points);
 vector<vector<float>> better_e_points(Mat im, vector<Mat> points);
 vector<vector<float>> get_e_location(Mat im, vector<float> score1, vector<float> score2, float distance_t, float score_t, int x);
 float corr_data(Mat im, vector<Mat> data);
-vector<int> class_score(Mat corr_matrix, float scale);
+vector<int> class_score(Mat corr_matrix,int n,float value);
 
 vector<vector<float>> number_area_recognition(Mat data, vector<vector<float>> points,vector<vector<Mat>> &model);
 vector<float> number_recognition(Mat data,vector<vector<Mat>> model);
@@ -62,8 +64,10 @@ vector<vector<float>> better_number_rec(vector<vector<float>> number,vector<vect
 vector<string> getFiles(string folder, string firstname, string lastname);
 
 float get_water_line(Mat data, vector<vector<float>> points);
-vector<vector<float>> select_e_area_by_line(Mat im, vector<Matx<float, 6, 1>> &lines1, vector<Matx<float, 6, 1>> &lines2,float distance);
+vector<vector<float>> select_e_area_by_line(Mat im, vector<Matx<float, 6, 1>> lines1, vector<Matx<float, 6, 1>> lines2,float distance);
 vector<vector<float>> cluster_v_line(vector<Matx<float, 6, 1>> &lines, vector<vector<Matx<float, 6, 1>>> &result, float distance);
+vector<vector<float>> claaify_h_lines(Mat im,vector<Matx<float, 6, 1>> lines, vector<Point3f> points, vector<Matx<float, 6, 1>> &lines1, vector<Matx<float, 6, 1>> &lines2, vector<Mat> & data);
+Mat get_area_by_lines(Mat im,vector<float> lines1,vector<float> lines2);
 
 vector<int> sub2ind(Mat m, vector<Point2f> point);
 vector<Point2i> ind2sub(Mat m, vector<int> ind);

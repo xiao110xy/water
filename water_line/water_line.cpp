@@ -69,6 +69,24 @@ Mat draw_line(Mat data, vector<Matx<float, 12, 1>> lines, vector<Scalar> rgb)
 	}
 	return result;
 }
+Mat draw_point(Mat data, vector<Point3f> points, Scalar rgb) {
+	Mat result;
+	if (data.channels() == 1) {
+		Mat temp[3];
+		temp[0] = data.clone(); temp[1] = data.clone(); temp[2] = data.clone();
+		merge(temp, 3, result);
+	}
+	else {
+		result = data.clone();
+	}
+	Point2i temp;
+	for (auto &i : points) {
+		temp.x = (int)round(i.x);
+		temp.y = (int)round(i.y);
+		circle(result, temp, 2, rgb, -1);
+	}
+	return result;
+}
 Mat draw_point(Mat data, vector<Point2i> points, Scalar rgb)
 {
 	Mat result;
@@ -260,7 +278,7 @@ vector<Matx<float, 12, 1>> get_parallel_lines(Mat image, vector<Matx<float, 6, 1
 	while (lines.size() > 0) {
 		Matx<float, 6, 1 > line = *lines.begin();
 		lines.erase(lines.begin());
-		vector<Matx<float, 6, 1>> new_line = merge_line(line, lines, data, 2.5, 20, 40);
+		vector<Matx<float, 6, 1>> new_line = merge_line(line, lines, data, 2.5, 10, 20);
 		//
 		test_im = draw_line(image, new_line, Scalar(0, 0, 255));
 		test_im = draw_line(test_im, vector<Matx<float, 6, 1>>{line}, Scalar(255, 0, 0));
@@ -404,10 +422,10 @@ vector<Matx<float, 6, 1>>  merge_line(Matx<float, 6, 1> line, vector<Matx<float,
 	// 按长度进行排序
 	new_line = line;
 	vector<Point> points;
-	vector<Matx<float, 6, 1>> temp;
-	for (int i = 0; i < 3; ++i)
-		temp.push_back(line);
-	temp.insert(temp.end(), lines.begin(), lines.end());
+	points = get_line_point(Point(line.val[0], line.val[1]), Point(line.val[2], line.val[3]));
+	Vec4f line_para;
+	fitLine(points, line_para, CV_DIST_FAIR, 0, 1e-2, 1e-2);
+	vector<Matx<float, 6, 1>> temp(lines.begin(), lines.end());
 	for (auto &i : temp) {
 		Point2f point1, point2;
 		point1.x = i.val[0];
@@ -417,8 +435,6 @@ vector<Matx<float, 6, 1>>  merge_line(Matx<float, 6, 1> line, vector<Matx<float,
 		vector<Point> temp_point = get_line_point(point1, point2);
 		points.insert(points.end(),temp_point.begin(),temp_point.end());
 	}
-	Vec4f line_para;
-	fitLine(points, line_para, CV_DIST_FAIR, 0, 1e-2, 1e-2);
 	new_line.val[0] = line.val[0];new_line.val[1] = line.val[1];
 	new_line.val[2] = line.val[2];new_line.val[3] = line.val[3];
 	for (auto &i : points) {
@@ -663,11 +679,11 @@ vector<water_result> segement_area(Mat I, vector<vector<Mat>> &model)
 	auto parallel_lines = get_parallel_lines(I, lines1, lines2);
 
 	// 延伸平行线中的端点，直到图像边界
+	test_im = draw_line(I, parallel_lines);
 	parallel_lines = extend_line(I, parallel_lines);
 	// 去除重叠区域
 	parallel_lines = subtract_iou(I, parallel_lines);
 
-	test_im = draw_line(I, parallel_lines);
 
 	if ((lines1.size() == 0) || (lines2.size() == 0) || (parallel_lines.size() == 0))
 		return vector<water_result>();
@@ -1119,7 +1135,49 @@ vector<Point2i> localmax_point(Mat score_image, float d_t, float scale)
 	}
 	return point;
 }
+vector<Point3f> localmax_point_score(Mat score_image, float d_t, float scale)
+{
+	// 获取所有可能的坐标
+	vector<Point3f> data,result;
+	//去除非中心位置
+	int x1 = (int)round(score_image.cols / 3.0);
+	int x2 = (int)round(2.0*score_image.cols / 3.0);
+	for (int i = x1; i < x2; ++i)
+		for (int j = 0; j < score_image.rows; ++j) {
+			if (score_image.at<float>(j, i) > 0) {
+				data.push_back(Point3f((float)i, (float)j, score_image.at<float>(j, i)));
+			}
+		}
+	int x, y;
+	while (data.size() > 0) {
+		vector<Point3f> temp;
+		auto index = max_element(data.begin(), data.end(),
+			[](const Point3f&a, const Point3f&b) {return a.z < b.z; });
+		temp.push_back(*index);
+		result.push_back(*index);
+		x = (int)temp[0].x; y = (int)temp[0].y;
+		data.erase(index);
+		temp.clear();
 
+		for (auto &i : data) {
+			if (abs(y - i.y) > d_t) {
+				temp.push_back(i);
+			}
+		}
+		data = temp;
+		temp.clear();
+	}
+	stable_sort(result.begin(), result.end(),
+		[](const Point3f&a, const Point3f&b) {return a.z > b.z; });
+	float score_t = result[0].y * scale;
+	for (int i = 0; i < result.size(); ++i) {
+		if (result[i].y < score_t) {
+			result.erase(result.begin() + i, result.end());
+			break;
+		}
+	}
+	return result;
+}
 vector<Mat> get_e_proposal_points(Mat im, vector<vector<Point2i>> points)
 {
 
@@ -1289,8 +1347,8 @@ vector<vector<float>> better_e_points(Mat im, vector<Mat> points)
 			corr_matrix2.at<float>(i, j) = result.at<float>(0, 0);
 		}
 	//
-	vector<int> index1 = class_score(corr_matrix1.clone(), (float)0.4);
-	vector<int> index2 = class_score(corr_matrix2.clone(), (float)0.2);
+	vector<int> index1 = class_score(corr_matrix1.clone(),1,(float)(0.4));
+	vector<int> index2 = class_score(corr_matrix2.clone(), 1, (float)(0.2));
 	vector<int> index;
 	for (auto &i : index1) {
 		if (find(index2.begin(), index2.end(), i) != index2.end())
@@ -1523,28 +1581,34 @@ float corr_data(Mat im, vector<Mat> data)
 	}
 	return score;
 }
-
-vector<int> class_score(Mat corr_matrix, float scale)
+vector<int> class_score(Mat corr_matrix,int n, float value)
 {
 	vector<int> index;
+	Mat temp_corr_matrix = corr_matrix.clone();
 	Point maxloc;
 	double maxval = 0;
-	minMaxLoc(corr_matrix, NULL, &maxval, NULL, &maxloc);
+	minMaxLoc(temp_corr_matrix, NULL, &maxval, NULL, &maxloc);
 	Mat temp;
 	int temp_index = maxloc.x;
 	float score = (float)maxval;
-	float score_t = scale *(float)maxval > (float)0.1 ? (float)scale * (float)maxval : (float)0.1;
-	score_t = score_t > (float)0.4 ? score_t : (float)0.4;
+	float score_t = 0;
+	if (n == 1) {
+		score_t = value *(float)maxval > (float)0.1 ? value * (float)maxval : (float)0.1;
+		score_t = score_t > (float)0.4 ? score_t : (float)0.4;
+	}
+	else {
+		score_t = value;
+	}
 	while (1) {
 		if (score < score_t) {
 			break;
 		}
 		else {
 			index.push_back(temp_index);
-			temp = corr_matrix.row(temp_index).clone();
+			temp = temp_corr_matrix.row(temp_index).clone();
 			temp.at<float>(0, temp_index) = -9;
-			corr_matrix.row(temp_index).setTo(-9);
-			corr_matrix.col(temp_index).setTo(-9);
+			temp_corr_matrix.row(temp_index).setTo(-9);
+			temp_corr_matrix.col(temp_index).setTo(-9);
 			score = -1;
 			for (int i = 0; i < temp.cols; ++i) {
 				if (score < temp.at<float>(0, i)) {
@@ -1743,8 +1807,6 @@ vector<vector<float>> better_number_rec(vector<vector<float>> number, vector<vec
 	return new_number;
 }
 
-
-
 vector<string> getFiles(string folder, string firstname, string lastname)
 {
 	vector<string> files;
@@ -1788,8 +1850,7 @@ float  get_water_line(Mat data, vector<vector<float>> points)
 	//
 	Mat im = data.clone();
 	float scale = (float)100.0 / (float)data.cols;
-	resize(data, im, Size(100, data.rows));
-	//
+	resize(im, im, Size(100, data.rows));
 	vector<Matx<float, 6, 1>> lines,lines1, lines2;
 	get_line(im, 5,45,lines1, lines2);
 	// 过滤一些直线
@@ -1801,8 +1862,6 @@ float  get_water_line(Mat data, vector<vector<float>> points)
 	}
 	lines = lines2;
 	lines1.clear(); lines2.clear();
-
-	// 
 	vector<Point> temp_points;
 	for (auto &i : lines) {
 		if (i.val[0] + i.val[2] < im.cols) {
@@ -1816,58 +1875,48 @@ float  get_water_line(Mat data, vector<vector<float>> points)
 	}
 	Vec4f line_para;
 	fitLine(temp_points, line_para, CV_DIST_FAIR, 0, 1e-2, 1e-2);
-	// 计算关键角点
-	Mat xy_filter, score_image, im_gray;
-	xy_filter = Mat::zeros(Size(7, 2), CV_32F);
-	xy_filter.colRange(0, 3).setTo(-1.0 / 6.0);
-	xy_filter.colRange(4, 7).setTo(1.0 / 6.0);
-	cvtColor(im, im_gray, CV_BGR2GRAY);
-	im_gray.convertTo(im_gray, CV_32F);
-	filter2D(im_gray, score_image, -1, xy_filter, cv::Point(-1, -1), 0.0, cv::BORDER_CONSTANT);
-	float d_t = (float)3;
-	temp_points = localmax_point(score_image, d_t, (float)0);// 非极大值抑制
 
-	test_im = im.clone();
-	test_im = draw_point(test_im, temp_points,Scalar(0, 255, 0));
-	//
-	xy_filter = Mat::zeros(Size(7, 2), CV_32F);
-	xy_filter.colRange(0, 3).setTo(1.0 / 6.0);
-	xy_filter.colRange(4, 7).setTo(-1.0 / 6.0);
-	cvtColor(im, im_gray, CV_BGR2GRAY);
-	im_gray.convertTo(im_gray, CV_32F);
-	filter2D(im_gray, score_image, -1, xy_filter, cv::Point(-1, -1), 0.0, cv::BORDER_CONSTANT);
-	d_t = (float)3;
-	temp_points = localmax_point(score_image, d_t, (float)0);// 非极大值抑制
-	test_im = draw_point(test_im, temp_points, Scalar(0, 0, 255));
-
-	xy_filter = Mat::zeros(Size(7, 2), CV_32F);
-	xy_filter.colRange(0, 3).setTo(1.0 / 6.0);
-	xy_filter.colRange(4, 7).setTo(-1.0 / 6.0);
-	cvtColor(im, im_gray, CV_BGR2GRAY);
-	im_gray.convertTo(im_gray, CV_32F);
-	filter2D(im_gray, score_image, -1, xy_filter, cv::Point(-1, -1), 0.0, cv::BORDER_CONSTANT);
-	d_t = (float)3;
-	temp_points = localmax_point(score_image, d_t, (float)0);// 非极大值抑制
-	test_im = draw_point(test_im, temp_points, Scalar(0, 0, 255));
-
+	vector<vector<float>> e_points = select_e_area_by_line(im, lines1, lines2, (float)data.cols);
 	float water_line = 0;
 	
 	//
 	return water_line;
 }
-vector<vector<float>> select_e_area_by_line(Mat im, vector<Matx<float, 6, 1>> &lines1, vector<Matx<float, 6, 1>> &lines2, float distance)
+vector<vector<float>> select_e_area_by_line(Mat im, vector<Matx<float, 6, 1>> lines1, vector<Matx<float, 6, 1>> lines2, float distance)
 {
 	Mat test_im;
+
+	//
+	Mat xy_filter, im_gray, score_image;
+	vector<Point3f> points1, points2;
+	cvtColor(im, im_gray, CV_BGR2GRAY);
+	im_gray.convertTo(im_gray, CV_32F);
+	float d_t = (float)(distance/10.0);
+	xy_filter = Mat::zeros(Size(7, 2), CV_32F);
+	xy_filter.colRange(0, 4).setTo(-1.0 / 8.0);xy_filter.colRange(4, 7).setTo(1.0 / 6.0);
+	filter2D(im_gray, score_image, -1, xy_filter, Point(-1, -1), 0.0, BORDER_CONSTANT);
+	points1 = localmax_point_score(score_image, d_t, (float)0);// 非极大值抑制
+	flip(xy_filter, xy_filter, 1);
+	filter2D(im_gray, score_image, -1, xy_filter, Point(-1, -1), 0.0, BORDER_CONSTANT);
+	points2 = localmax_point_score(score_image, d_t, (float)0);// 非极大值抑制
+
+
+
+	vector<Matx<float, 6, 1>> lines1_1, lines1_2, lines2_1, lines2_2;
+	vector<vector<float>> e_points,e_points1,e_points2;
+	vector<Mat> data1, data2;
+	e_points1 = claaify_h_lines(im_gray,lines1,points1,lines1_1, lines1_2,data1);
+	e_points2 = claaify_h_lines(im_gray,lines2,points2,lines2_1, lines2_2,data2);
 	test_im = im.clone();
-	test_im = draw_line(test_im, lines2, Scalar(255, 0, 0));
-	// 排序 由上往下
-
-
-
+	test_im = draw_line(test_im, lines1, Scalar(255, 0, 0));
+	test_im = draw_line(test_im, lines2, Scalar(0, 0, 255));
 	return vector<vector<float>>();
 }
 vector<vector<float>> cluster_v_line(vector<Matx<float, 6, 1>>& lines, vector<vector<Matx<float, 6, 1>>>& result, float distance)
 {
+	// 计算关键角点
+
+
 	float distance_t = 0;
 	distance_t = distance / 3;
 	Matx<float, 6, 1> line;
@@ -1904,6 +1953,171 @@ vector<vector<float>> cluster_v_line(vector<Matx<float, 6, 1>>& lines, vector<ve
 	}
 	result = temp;
 	return vector<vector<float>>();
+}
+vector<vector<float>> claaify_h_lines(Mat im,vector<Matx<float, 6, 1>> lines, vector<Point3f> points, vector<Matx<float, 6, 1>>& lines1, vector<Matx<float, 6, 1>>& lines2, vector<Mat> &data)
+{
+	lines1.clear();
+	lines2.clear();
+	for (auto &i : lines) {
+		auto temp = get_line_point(Point2f(i.val[0], i.val[1]), Point2f(i.val[2], i.val[3]));
+		int n1 = 0,n2=0;
+		for (auto &j : temp) {
+			if (j.y < 2) {
+				n1 += 1;
+				continue;
+			}
+			if (j.y>im.rows-3) {
+				n2 += 1;
+				continue;
+			}
+			if (j.x < 0)
+				j.x = 0;
+			if (j.x >im.cols-1)
+				j.x = im.cols - 1;
+			if ((im.at<float>(j.y - 2, j.x) + im.at<float>(j.y - 1, j.x) - im.at<float>(j.y +1, j.x) - im.at<float>(j.y + 2, j.x)) > 0)
+				n1 += 1;
+			else
+				n2 += 1;
+		}
+		if ((float)n1 / float(temp.size()) > 0.5)
+			lines1.push_back(i);
+		if (((float)n2 / float(temp.size()) > 0.5))
+			lines2.push_back(i);
+	}
+	//
+	vector<vector<float>> result;
+	for (auto i : points) {
+		float score1=999, score2 = 999;
+		int index_1=-1, index_2=-1;
+		for (int j = 0; j < lines1.size(); ++j) {
+			if (abs(2 * i.y - lines1[j].val[1] - lines1[j].val[3]) < score1) {
+				score1 = abs(2 * i.y - lines1[j].val[1] - lines1[j].val[3]);
+				index_1 = j;
+			}
+		}
+		for (int j = 0; j < lines2.size(); ++j) {
+			if (abs(2 * i.y - lines2[j].val[1] - lines2[j].val[3]) < score2) {
+				score2 = abs(2 * i.y - lines2[j].val[1] - lines2[j].val[3]);
+				index_2 = j;
+			}
+		}
+		if (index_1 <0 || index_2 < 0)
+			continue;
+		if (lines1[index_1].val[1] > lines2[index_2].val[1] || lines1[index_1].val[3] > lines2[index_2].val[3])
+			continue;
+		float angle_t = (lines1[index_1].val[4] < 90 ? lines1[index_1].val[4] + 90 : lines1[index_1].val[4] - 90)
+						- (lines2[index_2].val[4] < 90 ? lines2[index_2].val[4] + 90 : lines2[index_2].val[4] - 90);
+		bool flag = (lines1[index_1].val[1] + lines1[index_1].val[3] > im.cols) == (lines2[index_2].val[1] + lines2[index_2].val[3] > im.cols);
+		if (abs(angle_t)<10&&flag) {
+			vector<float> temp(15, -1);
+			temp[0] = i.x; temp[1] = i.y; temp[2] = i.z;
+			temp[3] = lines1[index_1].val[0] < lines2[index_2].val[0]? lines1[index_1].val[0]: lines2[index_2].val[0];
+			temp[4] = lines1[index_1].val[1] < lines1[index_1].val[3]? lines1[index_1].val[1]: lines1[index_1].val[3];
+			temp[5] = lines1[index_1].val[2] > lines2[index_2].val[2] ? lines1[index_1].val[2] : lines2[index_2].val[2];
+			temp[6] = lines2[index_2].val[1] > lines2[index_2].val[3] ? lines2[index_2].val[1] : lines2[index_2].val[3];
+			if (temp[4] > temp[6])
+				continue;
+			for (int j = 0; j < 4; ++j) {
+				temp[7+j] = lines1[index_1].val[j];
+				temp[11 +j] = lines2[index_2].val[j];
+			}
+			lines1.erase(lines1.begin() + index_1);
+			lines2.erase(lines2.begin() + index_2);
+			result.push_back(temp);
+		}
+	}
+	stable_sort(result.begin(),result.end(),
+				[](const vector<float>&a, const vector<float>&b) {return a[1] < b[1]; });
+	
+	Mat test_im = im.clone();
+	for (auto &i : result)
+		circle(test_im, Point(i[0], i[1]), 1,Scalar(255));
+	// 找到E区域
+	vector<vector<float>> result_e;
+	for (int i = 1; i < result.size()-1; ++i) {
+		if (abs((result[i - 1])[1] + (result[i + 1])[1] - 2 * (result[i])[1]) > 5)
+			continue;
+		vector<float> temp1((result[i-1]).begin() + 7, (result[i-1]).begin() + 11);
+		vector<float> temp2((result[i]).begin() + 11, (result[i]).end());
+		vector<float> temp3((result[i]).begin() + 7, (result[i]).begin() + 11);
+		vector<float> temp4((result[i+1]).begin() + 11, (result[i+1]).end());
+		Mat temp_im1 = get_area_by_lines(im, temp1, temp2);
+		Mat temp_im2 = get_area_by_lines(im, temp3, temp4);
+		if (temp_im1.total() == 0|| temp_im2.total() == 0)
+			continue;
+		temp_im1.convertTo(temp_im1, CV_32F);
+		temp_im2.convertTo(temp_im2, CV_32F);
+		resize(temp_im1, temp_im1, temp_im2.size(), cv::INTER_LINEAR);
+		Mat scores;
+		matchTemplate(temp_im1, temp_im2, scores, CV_TM_CCOEFF_NORMED);
+		if (scores.at<float>(0, 0) < 0.7)
+			continue;
+		vector<float> temp5((result[i - 1]).begin() + 7, (result[i - 1]).begin() + 11);
+		vector<float> temp6((result[i+1]).begin() + 11, (result[i+1]).end());
+		Mat temp_im = get_area_by_lines(im, temp5, temp6);
+		data.push_back(temp_im.clone());
+
+		vector<float> temp;
+		float x = 0;
+		for (int j = i - 1; j < i + 2; ++j) {
+			x+=(result[j])[0];
+			temp.push_back((result[j])[1]);
+		}
+		x = x / (float)3;
+		temp.push_back(x);
+		temp.insert(temp.end(), temp5.begin(), temp5.end());
+		temp.insert(temp.end(), temp6.begin(), temp6.end());
+		result_e.push_back(temp);
+	}
+	return result_e;
+}
+Mat get_area_by_lines(Mat im, vector<float> lines1, vector<float> lines2)
+{
+	float angle, angle1, angle2;
+	angle1 = float(atan(-(lines1[3] - lines1[1]) / (lines1[2] - lines1[0])) * 180 / atan(1) / 4);
+	angle2 = float(atan(-(lines2[3] - lines2[1]) / (lines2[2] - lines2[0])) * 180 / atan(1) / 4);
+	angle = (angle1 + angle2) / (float)2.0;
+	// 旋转原始影像
+	Point2d center(im.cols / 2.0, im.rows / 2.0);
+	Mat r = getRotationMatrix2D(center, -angle, 1.0);
+	Rect bbox = RotatedRect(center, im.size(),-angle).boundingRect();
+	r.at<double>(0, 2) += bbox.width / 2.0 - center.x;
+	r.at<double>(1, 2) += bbox.height / 2.0 - center.y;
+	Mat image_rotate;
+	cv::warpAffine(im, image_rotate, r, bbox.size());
+	r.convertTo(r, CV_32F);
+	// 截取大区域
+	Mat line1 = Mat::zeros(Size(4,2),CV_32F), line2 = Mat::zeros(Size(4, 2), CV_32F);
+	line1.at<float>(0, 0) = lines1[0];	line1.at<float>(1, 0) = lines1[1];	line1.at<float>(0, 1) = lines1[2];	line1.at<float>(1, 1) = lines1[3];
+	line2.at<float>(0, 0) = lines2[0];	line2.at<float>(1, 0) = lines2[1];	line2.at<float>(0, 1) = lines2[2];	line2.at<float>(1, 1) = lines2[3];
+	for (int j = 0; j < 2; ++j) {
+		Mat temp;
+		line1.col(j).copyTo(temp);
+		temp = r.colRange(0, 2) * temp + r.colRange(2, 3);
+		temp.copyTo(line1.col(j + 2));
+		line2.col(j).copyTo(temp);
+		temp = r.colRange(0, 2) * temp + r.colRange(2, 3);
+		temp.copyTo(line2.col(j + 2));
+	}
+	int r1, r2, c1, c2;
+	double temp1, temp2;
+	Mat temp(2, 4, CV_32F);
+	line1.colRange(2, 4).copyTo(temp.colRange(0, 2));
+	line2.colRange(2, 4).copyTo(temp.colRange(2, 4));
+	cv::minMaxIdx(temp.row(0), &temp1, &temp2);
+	c1 = (int)round(temp1) >= 0 ? (int)round(temp1) : 0;
+	c2 = (int)round(temp2) <= image_rotate.cols ? (int)round(temp2) : image_rotate.cols;
+	temp1 = (double)temp.at<float>(1, 0);
+	temp2 = (double)temp.at<float>(1, 1);
+	r1 = temp1 >= temp2 ? (int)ceil(temp1) : (int)ceil(temp2);
+	temp1 = (double)temp.at<float>(1, 2);
+	temp2 = (double)temp.at<float>(1, 3);
+	r2 = temp1 <= temp2 ? (int)floor(temp1) : (int)floor(temp2);
+	r2 = r2 <= image_rotate.rows ? r2 : image_rotate.rows;
+	if (r1 > r2)
+		return Mat();
+	Mat data = image_rotate(Range(r1, r2), Range(c1, c2));
+	return data;
 }
 vector<int> sub2ind(Mat m, vector<Point2i> point)
 {

@@ -59,8 +59,8 @@ int main(int argc, char** argv)
 	}
 	// 读入图像
 	auto all_file = getFiles("./", "", ".png");
-	for (auto &image_name : all_file) {
-	//string image_name = "18.png";
+	//for (auto &image_name : all_file) {
+	string image_name = "18.png";
 		Mat image = imread(image_name, IMREAD_COLOR);
 		if (!image.data)
 		{
@@ -68,8 +68,8 @@ int main(int argc, char** argv)
 			return -1;
 		}
 		vector<water_result> water = segement_area(image, model);
-		svaefile(image_name, water);
-	}
+		//svaefile(image_name, water);
+	//}
 
 	return 0;
 }
