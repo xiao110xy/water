@@ -1990,8 +1990,19 @@ float  get_water_line(Mat data, vector<vector<float>> points)
 	}
 	Vec4f line_para;
 	fitLine(temp_points, line_para, CV_DIST_FAIR, 0, 1e-2, 1e-2);
-
 	vector<vector<float>> e_points = select_e_area_by_line(im, lines1, lines2, (float)data.cols);
+	float y1 = 0, y2 = 0;
+	if (e_points.size() > 0) {
+		vector<float> temp = e_points[0];
+		y1 = temp[temp.size() - 1];
+		y2 = 1.7*(temp[temp.size() - 1] - temp[temp.size() - 2]) + temp[temp.size() - 1];
+	}
+	else{
+
+	}
+	im = data.clone();
+	im(Range(floor(y1), ceil(y2)), Range(0, data.cols)).copyTo(im);
+
 	float water_line = 0;
 	
 	//
@@ -2026,9 +2037,23 @@ vector<vector<float>> select_e_area_by_line(Mat im, vector<Matx<float, 6, 1>> li
 	test_im = draw_line(test_im, lines2, Scalar(0, 0, 255));
 	e_points1 = claaify_h_lines(im_gray,lines1,points1,lines1_1, lines1_2,data1, score1,true);
 	e_points2 = claaify_h_lines(im_gray,lines2,points2,lines2_1, lines2_2,data2, score2,false);
-
-
-	return vector<vector<float>>();
+	vector<float> temp,y,index;
+	temp.insert(temp.end(), e_points1[0].begin(), e_points1[0].end());
+	temp.insert(temp.end(), e_points2[0].begin(), e_points2[0].end());
+	y = cluster_value(temp, index);
+	temp.clear();
+	if (y.size() < 2)
+		return vector<vector<float>>{y};
+	for (int i = 0; i < y.size() - 1; ++i)
+		temp.push_back(y[i + 1] - y[i]);
+	temp = cluster_value(temp, index);
+	for (int i = 0; i < temp.size(); ++i) {
+		if (index[i] > index[0])
+			temp[0] = temp[i];
+	}
+	if (abs(y[y.size() - 1] - y[y.size() - 2]) > temp[0]&&y.size()>2)
+		y.erase(y.end() - 1);
+	return vector<vector<float>>{y};
 }
 vector<vector<float>> cluster_v_line(vector<Matx<float, 6, 1>>& lines, vector<vector<Matx<float, 6, 1>>>& result, float distance)
 {
@@ -2077,6 +2102,11 @@ vector<vector<float>> claaify_h_lines(Mat im, vector<Matx<float, 6, 1>> lines, v
 	int x1=0, x2=0;
 	lines1.clear();
 	lines2.clear();
+	Mat im_gray;
+	if (im.dims == 1)
+		im_gray = im.clone();
+	else
+		im.convertTo(im_gray, CV_32F);
 	for (auto &i : lines) {
 		auto temp = get_line_point(Point2f(i.val[0], i.val[1]), Point2f(i.val[2], i.val[3]));
 		int n1 = 0,n2=0;
@@ -2093,7 +2123,7 @@ vector<vector<float>> claaify_h_lines(Mat im, vector<Matx<float, 6, 1>> lines, v
 				j.x = 0;
 			if (j.x >im.cols-1)
 				j.x = im.cols - 1;
-			if ((im.at<float>(j.y - 2, j.x) + im.at<float>(j.y - 1, j.x) - im.at<float>(j.y +1, j.x) - im.at<float>(j.y + 2, j.x)) > 0)
+			if ((im_gray.at<float>(j.y - 2, j.x) + im_gray.at<float>(j.y - 1, j.x) - im_gray.at<float>(j.y +1, j.x) - im_gray.at<float>(j.y + 2, j.x)) > 0)
 				n1 += 1;
 			else
 				n2 += 1;
@@ -2211,6 +2241,47 @@ vector<vector<float>> claaify_h_lines(Mat im, vector<Matx<float, 6, 1>> lines, v
 	}
 	data.erase(data.begin(), data.begin() + corr_matrix.rows);
 	result_e.erase(result_e.begin(), result_e.begin() + corr_matrix.rows);
+	// 排除异常的data
+	Point2f row_t(0,0), col_t(0, 0);
+	vector<float> temp1,temp2,temp3;
+	if (data.size() == 0)
+		return vector<vector<float>>();
+	//row
+	for (int i = 0; i < data.size(); ++i) {
+		temp1.push_back((float)data[i].rows);
+		temp2.push_back((float)data[i].cols);
+	}
+	temp1 = cluster_value(temp1, temp3);
+	if (temp3.size() == 1) {
+		row_t.x = temp1[0];
+		row_t.y = temp3[0];
+	}
+	for (int i = 0; i < temp3.size(); ++i) {
+		if (row_t.x < temp1[i] && temp3[i] >= row_t.y) {
+			row_t.x = temp1[i];
+			row_t.y = temp3[i];
+		}
+	}
+	temp2 = cluster_value(temp2, temp3);
+	if (temp3.size() == 1) {
+		col_t.x = temp2[0];
+		col_t.y = temp3[0];
+	}
+	for (int i = 0; i < temp3.size(); ++i) {
+		if (col_t.x < temp2[i] && temp3[i] >= col_t.y) {
+			col_t.x = temp2[i];
+			col_t.y = temp3[i];
+		}
+	}
+	int num = (int)data.size();
+	for (int i = 0; i < num; ++i) {
+		if (abs(data[i].rows - row_t.x) < 5 && abs(data[i].cols - col_t.x) < 5) {
+			data.insert(data.end(), data[i]);
+			result_e.insert(result_e.end(), result_e[i]);
+		}
+	}
+	data.erase(data.begin(), data.begin() + num);
+	result_e.erase(result_e.begin(), result_e.begin() + num);
 	//
 	vector<vector<Point3f>> result_points;
 	for (int i = 0; i < data.size(); ++i) {
@@ -2221,9 +2292,11 @@ vector<vector<float>> claaify_h_lines(Mat im, vector<Matx<float, 6, 1>> lines, v
 
 	vector<float> y;
 	for (int i = 0; i < scores.size(); ++i) {
-		x1 = left_or_right ? 0 : 50 - data[i].cols / 2;
-		x2 = left_or_right ? 50 - data[i].cols / 2 : scores[i].cols - 1;
-		vector<Point3f> temp_points = localmax_point_score(scores[i], x1, x2, data[i].rows, 0);
+		//x1 = left_or_right ? 0 : 50 - data[i].cols / 2;
+		//x2 = left_or_right ? 50 - data[i].cols / 2 : scores[i].cols - 1;
+		x1 = 0;
+		x2 = scores[i].cols - 1;
+		vector<Point3f> temp_points = localmax_point_score(scores[i], x1, x2, data[i].rows/2, 0);
 		for (int j = 0; j < temp_points.size(); ++j) {
 			if (temp_points[j].z < 0.7) {
 				temp_points.erase(temp_points.begin() + j, temp_points.end());
@@ -2237,27 +2310,36 @@ vector<vector<float>> claaify_h_lines(Mat im, vector<Matx<float, 6, 1>> lines, v
 		y.insert(y.end(), temp.begin(), temp.end());
 	}
 	stable_sort(y.begin(), y.end());
-	vector<float> temp = y;
-	y.clear();
+	return vector<vector<float>>{y};
+}
+vector<float> cluster_value(vector<float> data, vector<float>& index)
+{
+	stable_sort(data.begin(), data.end());
+	vector<float> result;
+	if (data.size() <= 0)
+		return vector<float>();
+	index.clear();
 	while (1) {
-		float sum_y = temp[0];
+		float sum_y = data[0];
 		int i = 0;
-		for (; i < temp.size(); ++i) {
-			if (abs(sum_y - temp[i]) > 5) {
-				y.push_back(sum_y);
+		for (; i < data.size(); ++i) {
+			if (abs(sum_y - data[i]) > 5) {
+				result.push_back(sum_y);
+				index.push_back((float)(i));
 				break;
 			}
 			else {
-				sum_y = (sum_y*i + temp[i]) / (float)(i + 1);
+				sum_y = (sum_y*i + data[i]) / (float)(i + 1);
 			}
 		}
-		temp.erase(temp.begin(), temp.begin() + i);
-		if (temp.size() <= 1) {
-			y.push_back(sum_y);
+		data.erase(data.begin(), data.begin() + i);
+		if (data.size() == 0) {
+			result.push_back(sum_y);
+			index.push_back((float)(i));
 			break;
 		}
 	}
-	return vector<vector<float>>{y};
+	return result;
 }
 Mat get_area_by_lines(Mat im, vector<float> lines1, vector<float> lines2)
 {

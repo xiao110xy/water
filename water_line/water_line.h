@@ -70,6 +70,7 @@ float get_water_line(Mat data, vector<vector<float>> points);
 vector<vector<float>> select_e_area_by_line(Mat im, vector<Matx<float, 6, 1>> lines1, vector<Matx<float, 6, 1>> lines2,float distance);
 vector<vector<float>> cluster_v_line(vector<Matx<float, 6, 1>> &lines, vector<vector<Matx<float, 6, 1>>> &result, float distance);
 vector<vector<float>> claaify_h_lines(Mat im,vector<Matx<float, 6, 1>> lines, vector<Point3f> points, vector<Matx<float, 6, 1>> &lines1, vector<Matx<float, 6, 1>> &lines2, vector<Mat> & data, vector<Mat> &scores,bool left_or_right);
+vector<float> cluster_value(vector<float> data, vector<float> &index);
 Mat get_area_by_lines(Mat im,vector<float> lines1,vector<float> lines2);
 
 vector<int> sub2ind(Mat m, vector<Point2f> point);
