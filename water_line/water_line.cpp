@@ -794,7 +794,7 @@ vector<water_result> segement_area(Mat I, vector<vector<Mat>> &model)
 	// 去除重叠区域
 	parallel_lines = subtract_iou(I, parallel_lines);
 
-
+	test_im = draw_line(I, parallel_lines);
 	if ((lines1.size() == 0) || (lines2.size() == 0) || (parallel_lines.size() == 0))
 		return vector<water_result>();
 	vector<water_result> result;
@@ -862,7 +862,7 @@ vector<water_result> segement_area(Mat I, vector<vector<Mat>> &model)
 				(number[i])[0] = (float)(9.75 - i * 0.5 + (int)number.size() % 20 * 10);
 		}
 		// 得出水线
-		float water_line = get_water_line(data, points);
+		float water_line = get_water_line(image_rotate(Range(r1, r2), Range(c1, c2)).clone(), points);
 
 		// 得到数值
 		vector<float> temp_water;
@@ -1994,8 +1994,12 @@ float  get_water_line(Mat data, vector<vector<float>> points)
 	float y1 = 0, y2 = 0;
 	if (e_points.size() > 0) {
 		vector<float> temp = e_points[0];
-		y1 = temp[temp.size() - 1];
-		y2 = 1.7*(temp[temp.size() - 1] - temp[temp.size() - 2]) + temp[temp.size() - 1];
+		if (temp.size() > 0) {
+			y1 = temp[temp.size() - 1];
+			y2 = 1.7*(temp[temp.size() - 1] - temp[temp.size() - 2]) + temp[temp.size() - 1];
+			y1 = y1 < data.rows - 1 ? y1 : data.rows - 1;
+			y2 = y2 < data.rows - 1 ? y2 : data.rows - 1;
+		}
 	}
 	else{
 
@@ -2038,8 +2042,10 @@ vector<vector<float>> select_e_area_by_line(Mat im, vector<Matx<float, 6, 1>> li
 	e_points1 = claaify_h_lines(im_gray,lines1,points1,lines1_1, lines1_2,data1, score1,true);
 	e_points2 = claaify_h_lines(im_gray,lines2,points2,lines2_1, lines2_2,data2, score2,false);
 	vector<float> temp,y,index;
-	temp.insert(temp.end(), e_points1[0].begin(), e_points1[0].end());
-	temp.insert(temp.end(), e_points2[0].begin(), e_points2[0].end());
+	if (e_points1.size()>0)
+		temp.insert(temp.end(), e_points1[0].begin(), e_points1[0].end());
+	if (e_points2.size()>0)
+		temp.insert(temp.end(), e_points2[0].begin(), e_points2[0].end());
 	y = cluster_value(temp, index);
 	temp.clear();
 	if (y.size() < 2)
