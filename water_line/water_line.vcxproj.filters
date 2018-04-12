@@ -27,6 +27,42 @@
     <ClInclude Include="water_line.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="BgDefaults.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="BgEdge.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="BgEdgeDetect.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="BgEdgeList.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="BgImage.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="MeanShiftSegmentor.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="ms.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="msImageProcessor.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="msSys.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="RAList.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="rlist.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="tdef.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -36,6 +72,39 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="water_line.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="BgEdge.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="BgEdgeDetect.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="BgEdgeList.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="BgGlobalFc.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="BgImage.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="MeanShiftSegmentor.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="msImageProcessor.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="msSys.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="ms.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="RAList.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="rlist.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

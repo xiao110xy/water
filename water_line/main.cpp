@@ -3,6 +3,7 @@
 
 #include "stdafx.h"
 #include "water_line.h"
+
 #include <iostream>
 
 
@@ -60,7 +61,7 @@ int main(int argc, char** argv)
 	// 读入图像
 	auto all_file = getFiles("./", "", ".png");
 	//for (auto &image_name : all_file) {
-	string image_name = "27.png";
+	string image_name = "10.png";
 		Mat image = imread(image_name, IMREAD_COLOR);
 		if (!image.data)
 		{

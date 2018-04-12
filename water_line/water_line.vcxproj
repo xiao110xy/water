@@ -142,11 +142,34 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="BgDefaults.h" />
+    <ClInclude Include="BgEdge.h" />
+    <ClInclude Include="BgEdgeDetect.h" />
+    <ClInclude Include="BgEdgeList.h" />
+    <ClInclude Include="BgImage.h" />
+    <ClInclude Include="MeanShiftSegmentor.h" />
+    <ClInclude Include="ms.h" />
+    <ClInclude Include="msImageProcessor.h" />
+    <ClInclude Include="msSys.h" />
+    <ClInclude Include="RAList.h" />
+    <ClInclude Include="rlist.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
+    <ClInclude Include="tdef.h" />
     <ClInclude Include="water_line.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="BgEdge.cpp" />
+    <ClCompile Include="BgEdgeDetect.cpp" />
+    <ClCompile Include="BgEdgeList.cpp" />
+    <ClCompile Include="BgGlobalFc.cpp" />
+    <ClCompile Include="BgImage.cpp" />
+    <ClCompile Include="MeanShiftSegmentor.cpp" />
+    <ClCompile Include="ms.cpp" />
+    <ClCompile Include="msImageProcessor.cpp" />
+    <ClCompile Include="msSys.cpp" />
+    <ClCompile Include="RAList.cpp" />
+    <ClCompile Include="rlist.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>

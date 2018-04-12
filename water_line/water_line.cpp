@@ -862,7 +862,8 @@ vector<water_result> segement_area(Mat I, vector<vector<Mat>> &model)
 				(number[i])[0] = (float)(9.75 - i * 0.5 + (int)number.size() % 20 * 10);
 		}
 		// 得出水线
-		float water_line = get_water_line(image_rotate(Range(r1, r2), Range(c1, c2)).clone(), points);
+		Mat mask;
+		float water_line = get_water_line_meanshift(data, points,mask);
 
 		// 得到数值
 		vector<float> temp_water;
@@ -1952,6 +1953,131 @@ vector<string> getFiles(string folder, string firstname, string lastname)
 		_findclose(hFile);
 	}
 	return files;
+}
+float get_water_line_meanshift(Mat data, vector<vector<float>> points, Mat &result)
+{
+	resize(data, data, Size(50, data.rows));
+	imwrite("temp_compute.jpg", data);
+	//data = imread("temp_compute.jpg");
+	float water_line = (float)(data.rows - 1);
+	int y = 0;
+	if (points.size() > 3)
+		y = (int)(points[points.size() - 2])[1];
+	else
+		y = (int)(points[points.size() - 1])[1];
+	Mat im = data.clone();
+	float sigmarS = 10, sigmarR = 15;
+	int label;
+	vector<float> y_num;
+	Mat mask, label_mask;
+	while (1) {
+		MeanShiftSegmentor s;
+		s.m_SigmaS = sigmarS;
+		s.m_SigmaR = sigmarR;
+		s.SetImage(im);
+		s.Run();
+		s.ShowResult();
+		result = s.showImg.clone();
+		mask = s.m_Result.clone();
+		bool flag = get_label_mask(mask,y, label,label_mask);
+		if (flag) {
+			for (int i = 0; i < mask.cols; ++i) {
+				for(int j =0;j<mask.rows;++j)
+					if (mask.at<int>(j, i) == label) {
+						y_num.push_back((float)j);
+						break;
+					}
+			}
+			break;
+		}
+		else {
+			sigmarS = sigmarS + 1;
+			sigmarR = sigmarR + 2;
+		}
+		if (sigmarR > 30)
+			return water_line;
+
+	}
+	water_line = 0;
+	int index1 = (int)y_num.size() / 3, index2= 2 * (int)y_num.size() / 3;
+	for (int i = index1; i < index2; ++i)
+		if (water_line < y_num[i])
+			water_line = y_num[i];
+	return water_line;
+}
+bool get_label_mask(Mat mask, int y, int & label, Mat &label_mask)
+{
+	Mat data = mask.clone();
+	if (y < 0 || y>mask.rows - 1)
+		y = 0;
+	int n = 0;
+	int *mask_ptr = mask.ptr<int>(0);
+	for (int i = 0; i < mask.total(); ++i) {
+		if (mask_ptr[i] > n)
+			n = mask_ptr[i];
+	}
+	vector<vector<int>> temp_label(n+1);
+	for (int i = y; i < mask.rows; ++i) {
+		int j = 0;
+		for (j = 0; j < mask.cols; ++j) {
+			if (mask.at<int>(i, j) != mask.at<int>(i, 0))
+				break;
+		}
+		if (j == mask.cols)
+			temp_label[mask.at<int>(i, 0)].push_back(i);
+	}
+	for (int i = 0; i <= y; ++i) {
+		temp_label[mask.at<int>(i, 0)].clear();
+	}
+	label = -1;
+	for (int i = 0; i < n; ++i) {
+		if (temp_label[i].size() > 10) {
+			label = i;
+			break;
+		}
+	}
+	Mat temp_mask = Mat::zeros(mask.size(), CV_8UC1);
+	label_mask = Mat::zeros(mask.size(), CV_8UC1);
+	for (int i = 0; i < mask.total(); ++i) {
+		*(label_mask.ptr<uchar>(0) + i) = *(mask.ptr<int>(0) + i) == label ? 1 : 0;
+		*(temp_mask.ptr<uchar>(0) + i) = *(mask.ptr<int>(0) + i) != label ? -1 : 0;
+	}
+	vector<vector<Point>> contours;
+	vector<Vec4i> hierarchy;
+	Mat temp = Mat::ones(Size(label_mask.cols + 2, label_mask.rows), CV_8UC1);
+	label_mask.copyTo(temp.colRange(Range(1, temp.cols - 1)));
+	//进行膨胀操作  
+	Mat element = getStructuringElement(MORPH_RECT, Size(3, 3));
+	dilate(temp, temp, element);
+	findContours(temp,contours,hierarchy, CV_RETR_CCOMP, CV_CHAIN_APPROX_SIMPLE,Point());
+	if (label ==-1||contours.size()>3)
+		return false;
+	int y1_min= label_mask.rows, y1_max=0, y2_min= label_mask.rows, y2_max = 0;
+	for (int i = 0; i < label_mask.cols; ++i) {
+		int y1 = -1; int y2=-1;
+		for (int j = 0; j < label_mask.rows; ++j) {
+			if (label_mask.at<uchar>(j, i) == 1) {
+				y1 = j;
+				break;
+			}
+		}
+		for (int j = label_mask.rows-1; j >=0; --j) {
+			if (label_mask.at<uchar>(j, i) == 1) {
+				y2 = j;
+				break;
+			}
+		}
+		if (y1 < 0 || y2 < 0)
+			continue;
+		y1_min = y1_min < y1 ? y1_min : y1;
+		y2_min = y2_min < y2 ? y2_min : y2;
+		y1_max = y1_max > y1 ? y1_max : y1;
+		y2_max = y2_max > y2 ? y2_max : y2;
+	}
+	float per_t = (float)(y2_min - y1_max) / (float)(y2_max - y1_min);
+	if (per_t < 0.6)
+		return false;
+	return true;
 }
 float  get_water_line(Mat data, vector<vector<float>> points)
 {
