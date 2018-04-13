@@ -5,9 +5,13 @@
 #include <vector> 
 #include <string>
 #include <list>
+#include <fstream> 
+#include <iomanip>
 #include <io.h>
 struct water_result {
 	Mat data;
+	vector<float> parrallel_lines;
+	vector<float> water_lines;
 	vector<vector<float>> points;
 	vector<vector<float>> number;
 	int water_line;
@@ -49,6 +53,8 @@ vector<Matx<float, 12, 1>>  subtract_iou(Mat I,vector<Matx<float, 12, 1>> parall
 Mat sub_water_area(Mat I,Mat &line1,Mat &line2);
 vector<Matx<float, 6, 1>> select_h_lines(Mat I, vector<Matx<float, 6, 1>> lines1, vector<Matx<float, 6, 1>> lines2);
 Mat get_e_boundary(Mat I, vector<Matx<float, 6, 1>> lines);
+vector<float> rotated2unrotated_point(Point2f point, Mat r);
+
 
 vector<vector<float>> compute_e_point(Mat I, Mat location);
 vector<Point2i> localmax_point(Mat score_image, float d_t,float scale);
@@ -77,7 +83,8 @@ Mat get_area_by_lines(Mat im,vector<float> lines1,vector<float> lines2);
 vector<int> sub2ind(Mat m, vector<Point2f> point);
 vector<Point2i> ind2sub(Mat m, vector<int> ind);
 
-void svaefile(string image_name, vector<water_result> water);
+void svaefile(Mat im,string image_name, vector<water_result> water);
+void svaefile(Mat im,string image_name, vector<water_result> water,string result_image,string result_txt);
 
 
 

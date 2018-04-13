@@ -857,9 +857,17 @@ vector<water_result> segement_area(Mat I, vector<vector<Mat>> &model)
 		if (points.size() == 0)
 			continue;
 		vector<vector<float>> number = number_area_recognition(data, points, model);
-		if (number.size() == 0) {
+		if (number.size() != 0) {
+			vector<float> temp;
 			for (int i = 0; i < number.size(); ++i)
-				(number[i])[0] = (float)(9.75 - i * 0.5 + (int)number.size() % 20 * 10);
+				if ((number[i])[0] > 9.5&&i!=0)
+					temp.push_back((number[i])[0]);
+			int n = temp.size();
+			(number[0])[0] += n * 10;
+			for (int i = 0; i < number.size(); ++i) {
+				(number[i])[0] = (float)((number[0])[0] - i * 0.5);
+			}
+				
 		}
 		// 得出水线
 		Mat mask;
@@ -886,9 +894,42 @@ vector<water_result> segement_area(Mat I, vector<vector<Mat>> &model)
 		water_number = water_number / p;
 
 		water_result water_area;
+		//
+		float x, y;
+		//
+		temp_water.clear();
+		x = c1 + location.at<int>(0,0);y = r1;
+		temp_p = rotated2unrotated_point(Point2f(x, y), r);
+		temp_water.insert(temp_water.end(), temp_p.begin(), temp_p.end());
+		x = c1 + location.at<int>(0,0);y = r2;
+		temp_p = rotated2unrotated_point(Point2f(x, y), r);
+		temp_water.insert(temp_water.end(), temp_p.begin(), temp_p.end());
+		x = c1 + location.at<int>(0,1);y = r1;
+		temp_p = rotated2unrotated_point(Point2f(x, y), r);
+		temp_water.insert(temp_water.end(), temp_p.begin(), temp_p.end());
+		x = c1 + location.at<int>(0,1);y = r2;
+		temp_p = rotated2unrotated_point(Point2f(x, y), r);
+		temp_water.insert(temp_water.end(), temp_p.begin(), temp_p.end());
+		water_area.parrallel_lines = temp_water;
+		// 水面线
+		temp_water.clear();
+		x = c1 + location.at<int>(0, 0) + 0.5; y = water_line + r1;
+		temp_p = rotated2unrotated_point(Point2f(x, y), r);
+		temp_water.insert(temp_water.end(), temp_p.begin(), temp_p.end());
+		x = c1 + location.at<int>(0, 0)+data.cols-0.5; y = water_line + r1;
+		temp_p = rotated2unrotated_point(Point2f(x, y), r);
+		temp_water.insert(temp_water.end(), temp_p.begin(), temp_p.end());
+		water_area.water_lines = temp_water;
+		//
 		water_area.data = data.clone();
 		water_area.number = number;
-		water_area.points = points;
+		for (int i = 0; i < points.size(); ++i) {
+			vector<float> temp = rotated2unrotated_point(Point2f(c1 + location.at<int>(0, 0)+(points[i])[0], (points[i])[1]+r1), r);
+			temp.push_back((points[i])[2]);
+			temp.push_back((points[i])[3]);
+			water_area.points.push_back(temp);
+		}
+	
 		water_area.water_number = water_number;
 		water_area.water_line = (int)water_line;
 		result.push_back(water_area);
@@ -1131,6 +1172,22 @@ Mat get_e_boundary(Mat I, vector<Matx<float, 6, 1>> lines)
 	if (location.at<int>(0, 2) < 10)
 		return  Mat();
 	return location;
+}
+
+vector<float> rotated2unrotated_point(Point2f point, Mat r)
+{
+	// 平行线
+	Mat invert_r = Mat::zeros(Size(3,3),CV_32F);
+	r.copyTo(invert_r.rowRange(0, 2));
+	invert_r.at<float>(2, 2) = 1;
+	invert(invert_r, invert_r);
+	float x, y;
+	x = invert_r.at<float>(0, 0)*point.x + invert_r.at<float>(0, 1)*point.y + invert_r.at<float>(0, 2);
+	y = invert_r.at<float>(1, 0)*point.x + invert_r.at<float>(1, 1)*point.y + invert_r.at<float>(1, 2);
+	vector<float> temp;
+	temp.push_back(x);
+	temp.push_back(y);
+	return temp;
 }
 
 vector<vector<float>> compute_e_point(Mat I, Mat location)
@@ -1957,7 +2014,7 @@ vector<string> getFiles(string folder, string firstname, string lastname)
 float get_water_line_meanshift(Mat data, vector<vector<float>> points, Mat &result)
 {
 	resize(data, data, Size(50, data.rows));
-	imwrite("temp_compute.jpg", data);
+	//imwrite("temp_compute.jpg", data);
 	//data = imread("temp_compute.jpg");
 	float water_line = (float)(data.rows - 1);
 	int y = 0;
@@ -1982,7 +2039,7 @@ float get_water_line_meanshift(Mat data, vector<vector<float>> points, Mat &resu
 		bool flag = get_label_mask(mask,y, label,label_mask);
 		if (flag) {
 			for (int i = 0; i < mask.cols; ++i) {
-				for(int j =0;j<mask.rows;++j)
+				for (int j = 0; j < mask.rows; ++j)
 					if (mask.at<int>(j, i) == label) {
 						y_num.push_back((float)j);
 						break;
@@ -2003,6 +2060,51 @@ float get_water_line_meanshift(Mat data, vector<vector<float>> points, Mat &resu
 	for (int i = index1; i < index2; ++i)
 		if (water_line < y_num[i])
 			water_line = y_num[i];
+	//// 腐蚀 膨胀
+	//Mat element1 = getStructuringElement(MORPH_RECT, Size(2, index2- index1));
+	//Mat element2 = getStructuringElement(MORPH_RECT, Size(5, 3));
+	//Mat element3 = getStructuringElement(MORPH_RECT, Size(15, 2));
+	//Mat temp = label_mask.clone(),temp1,temp2,temp3,temp4,temp5,temp6;
+	//vector<Point> point;
+	//erode(temp, temp1, element1);
+	//erode(temp1, temp2, element2);
+	//dilate(temp2, temp3, element3);
+	//erode(temp3, temp4, element3);
+	//dilate(temp4, temp5, element2);
+	//dilate(temp5, temp6, element1);
+
+	//temp = temp6.clone();
+	//for (int i = 0; i < 50; ++i)
+	//	for (int j = 0; j<temp.rows; ++j)
+	//		if (temp.at<uchar>(j, i) == 1) {
+	//			point.push_back(Point(i, j));
+	//			break;
+	//		}
+	//Vec4f line_para;
+	//fitLine(point, line_para, CV_DIST_L2, 0, 1e-2, 1e-2);
+	//water_line = (24.5 - line_para[2]) / line_para[0] * line_para[1] + line_para[3];	//// 腐蚀 膨胀
+	//Mat element1 = getStructuringElement(MORPH_RECT, Size(2, index2- index1));
+	//Mat element2 = getStructuringElement(MORPH_RECT, Size(5, 3));
+	//Mat element3 = getStructuringElement(MORPH_RECT, Size(15, 2));
+	//Mat temp = label_mask.clone(),temp1,temp2,temp3,temp4,temp5,temp6;
+	//vector<Point> point;
+	//erode(temp, temp1, element1);
+	//erode(temp1, temp2, element2);
+	//dilate(temp2, temp3, element3);
+	//erode(temp3, temp4, element3);
+	//dilate(temp4, temp5, element2);
+	//dilate(temp5, temp6, element1);
+
+	//temp = temp6.clone();
+	//for (int i = 0; i < 50; ++i)
+	//	for (int j = 0; j<temp.rows; ++j)
+	//		if (temp.at<uchar>(j, i) == 1) {
+	//			point.push_back(Point(i, j));
+	//			break;
+	//		}
+	//Vec4f line_para;
+	//fitLine(point, line_para, CV_DIST_L2, 0, 1e-2, 1e-2);
+	//water_line = (24.5 - line_para[2]) / line_para[0] * line_para[1] + line_para[3];
 	return water_line;
 }
 bool get_label_mask(Mat mask, int y, int & label, Mat &label_mask)
@@ -2544,28 +2646,147 @@ vector<Point2i> ind2sub(Mat m, vector<int> ind)
 	return result;
 }
 
-void svaefile(string image_name, vector<water_result> water)
+void svaefile(Mat im, string image_name, vector<water_result> water)
 {
 	string temp(image_name), name;
 	for (int i = 0; i < temp.size() - 4; ++i) {
 		name += temp[i];
 	}
 	//结果保存
+	Mat result = im.clone();
+	vector<vector<float>> temp_water_number;
 	for (int i = 0; i < water.size(); ++i) {
-		Mat result;
+
 		water_result temp = *(water.begin() + i);
-		Mat data = temp.data;
-		//
-		result = draw_point(temp.data, temp.points);
-		Point temp1(0, temp.water_line), temp2(temp.data.cols, temp.water_line);
-		line(result, temp1, temp2, Scalar(0, 255, 0), 1);
-		string s(name);
-		s = s.substr();
-		s.append("_");
+		// 画出点
+		result = draw_point(result, temp.points);
+		// 画出水尺区域线
+		line(result, Point2f(temp.parrallel_lines[0], temp.parrallel_lines[1]), Point2f(temp.parrallel_lines[2], temp.parrallel_lines[3]), Scalar(255, 0, 0), 2);
+		line(result, Point2f(temp.parrallel_lines[4], temp.parrallel_lines[5]), Point2f(temp.parrallel_lines[6], temp.parrallel_lines[7]), Scalar(255, 0, 0), 2);
+		// 画出水线
+		line(result, Point2f(temp.water_lines[0], temp.water_lines[1]), Point2f(temp.water_lines[2], temp.water_lines[3]), Scalar(0, 255, 0), 2);
+		// 画出数值
 		ostringstream ss;
 		ss << round(temp.water_number * 100) / 10;
-		s.append(ss.str());
-		s.append("_cm.jpg");
-		imwrite(s, result);
+		string text = ss.str() + "cm";
+		int font_face = cv::FONT_HERSHEY_COMPLEX;
+		double font_scale = 1;
+		int thickness = 2;
+		int baseline;
+		//获取文本框的长宽  
+		Size text_size = cv::getTextSize(text, font_face, font_scale, thickness, &baseline);
+		Point2f temp_point((temp.points[temp.points.size() - 1])[0], (temp.points[temp.points.size() - 1])[1]);
+		if (temp_point.x < result.cols / 2)
+			temp_point.x = temp_point.x + 30;
+		else
+			temp_point.x = temp_point.x - 30 - text_size.width;
+		putText(result, text, temp_point, font_face, font_scale, cv::Scalar(0, 255, 255), thickness, 8, 0);
+		vector<float> temp1;
+		temp1.push_back(temp_point.x);
+		temp1.push_back(round(temp.water_number * 100) / 10);
+		temp_water_number.push_back(temp1);
 	}
+	// 读写图像
+	stable_sort(temp_water_number.begin(), temp_water_number.end(),
+		[](vector<float>a, vector<float>b) {return a[0] < b[0]; });
+	string s;
+	ostringstream ss;
+	for (int i = 0; i < temp_water_number.size(); ++i) {
+		ss << "=";
+		int temp= round((temp_water_number[i])[1]*10);
+		if (temp < 0) {
+			ss << "-";
+			temp = abs(temp);
+		}
+		ss << temp / 10;
+		ss << ",";
+		ss << temp % 10;
+	}
+	s = "result_" + name +ss.str()+ ".jpg";
+	imwrite(s, result);
+	//// 读写文件
+	//name = name + ".txt";
+	//stable_sort(temp_water_number.begin(), temp_water_number.end(),
+	//	[](vector<float>a, vector<float>b) {return a[0] < b[0]; });
+	//ofstream file(name);
+	//for (int i = 0; i < temp_water_number.size(); ++i) {
+	//	file << "=";
+	//	file << fixed << setprecision(1) << (temp_water_number[i])[1];
+	//}
+	//file.close();
+	//ofstream file(name);
+	//file.width(16);
+	//file.setf(ios::left);
+	//for (int i = 0; i < water.size(); ++i) {
+	//	water_result temp = *(water.begin() + i);
+	//	file << "水尺区域";
+	//	file << "第"<<(i + 1) <<"块"<< endl;
+	//	file << "水位" << endl;
+	//	file << round(temp.water_number * 100) / 10 << endl;
+	//	file << "水尺" << endl;
+	//	file << "x1";file << "y1";file << "x2";file << "y2";
+	//	for (int j = 0; j < temp.parrallel_lines.size(); ++j) {
+	//		if ((j%4)==0)
+	//			file << endl;
+	//		file << fixed << setprecision(2) << temp.parrallel_lines[j];
+	//	}
+	//	file << endl;
+	//	file << "水面线" << endl;
+	//	file << "x1"; file << "y1"; file << "x2"; file << "y2";
+	//	for (int j = 0; j < temp.water_lines.size(); ++j) {
+	//		if ((j % 4) == 0)
+	//			file << endl;
+	//		file << fixed << setprecision(2) << temp.water_lines[j];
+	//	}
+	//	file << endl;
+	//file.close();
+}
+
+void svaefile(Mat im, string image_name, vector<water_result> water, string result_image, string result_txt)
+{
+	//结果保存
+	Mat result = im.clone();
+	vector<vector<float>> temp_water_number;
+	for (int i = 0; i < water.size(); ++i) {
+
+		water_result temp = *(water.begin() + i);
+		// 画出点
+		result = draw_point(result, temp.points);
+		// 画出水尺区域线
+		line(result, Point2f(temp.parrallel_lines[0], temp.parrallel_lines[1]), Point2f(temp.parrallel_lines[2], temp.parrallel_lines[3]), Scalar(255, 0, 0), 2);
+		line(result, Point2f(temp.parrallel_lines[4], temp.parrallel_lines[5]), Point2f(temp.parrallel_lines[6], temp.parrallel_lines[7]), Scalar(255, 0, 0), 2);
+		// 画出水线
+		line(result, Point2f(temp.water_lines[0], temp.water_lines[1]), Point2f(temp.water_lines[2], temp.water_lines[3]), Scalar(0, 255, 0), 2);
+		// 画出数值
+		ostringstream ss;
+		ss << round(temp.water_number * 100) / 10;
+		string text = ss.str() + "cm";
+		int font_face = cv::FONT_HERSHEY_COMPLEX;
+		double font_scale = 1;
+		int thickness = 2;
+		int baseline;
+		//获取文本框的长宽  
+		Size text_size = cv::getTextSize(text, font_face, font_scale, thickness, &baseline);
+		Point2f temp_point((temp.points[temp.points.size() - 1])[0], (temp.points[temp.points.size() - 1])[1]);
+		if (temp_point.x < result.cols / 2)
+			temp_point.x = temp_point.x + 30;
+		else
+			temp_point.x = temp_point.x - 30 - text_size.width;
+		putText(result, text, temp_point, font_face, font_scale, cv::Scalar(0, 255, 255), thickness, 8, 0);
+		vector<float> temp1;
+		temp1.push_back(temp_point.x);
+		temp1.push_back(round(temp.water_number * 100) / 10);
+		temp_water_number.push_back(temp1);
+	}
+	// 读写图像
+	imwrite(result_image, result);
+	// 读写文件
+	stable_sort(temp_water_number.begin(), temp_water_number.end(),
+		[](vector<float>a, vector<float>b) {return a[0] < b[0]; });
+	ofstream file(result_txt);
+	for (int i = 0; i < temp_water_number.size(); ++i) {
+		file << "=";
+		file << fixed << setprecision(1) << (temp_water_number[i])[1];
+	}
+	file.close();
 }

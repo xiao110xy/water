@@ -8,7 +8,7 @@ MeanShiftSegmentor::MeanShiftSegmentor(void)
 
 	m_SigmaS = 10;
 	m_SigmaR = 15;
-	m_MinRegion = 20;
+	m_MinRegion = 25;
 	m_SpeedUpLevel = MED_SPEEDUP;
 
 	gradWindowRadius=4;

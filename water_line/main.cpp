@@ -59,18 +59,38 @@ int main(int argc, char** argv)
 		}
 	}
 	// 读入图像
-	auto all_file = getFiles("./", "", ".png");
-	//for (auto &image_name : all_file) {
-	string image_name = "10.png";
-		Mat image = imread(image_name, IMREAD_COLOR);
-		if (!image.data)
-		{
-			printf(" No image data \n ");
-			return -1;
-		}
-		vector<water_result> water = segement_area(image, model);
-		//svaefile(image_name, water);
-	//}
 
-	return 0;
+	if (argc == 1) {
+		cout << "please input image name\n";
+		return 0;
+	}
+	if (argc != 2) {
+		cout << "please only input image name\n";
+		return 0;
+	}
+	string image_name(argv[1]);
+	string result_image, result_txt;
+	Mat image = imread(image_name, IMREAD_COLOR);
+	if (!image.data)
+	{
+		cout << " No image data \n";
+		return -1;
+	}
+	vector<water_result> water = segement_area(image, model);
+	svaefile(image, image_name, water);
+
+
+
+	//auto all_file = getFiles("./", "", ".png");
+	//for (auto &image_name : all_file) {
+	//	Mat image = imread(image_name, IMREAD_COLOR);
+	//	if (!image.data)
+	//	{
+	//		cout<<" No image data \n";
+	//		return -1;
+	//	}
+	//	vector<water_result> water = segement_area(image, model);
+	//	svaefile(image,image_name, water);
+	//}
+	//return 0;
 }
