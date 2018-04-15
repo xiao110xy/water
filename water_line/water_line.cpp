@@ -2652,94 +2652,8 @@ void svaefile(Mat im, string image_name, vector<water_result> water)
 	for (int i = 0; i < temp.size() - 4; ++i) {
 		name += temp[i];
 	}
-	//结果保存
-	Mat result = im.clone();
-	vector<vector<float>> temp_water_number;
-	for (int i = 0; i < water.size(); ++i) {
-
-		water_result temp = *(water.begin() + i);
-		// 画出点
-		result = draw_point(result, temp.points);
-		// 画出水尺区域线
-		line(result, Point2f(temp.parrallel_lines[0], temp.parrallel_lines[1]), Point2f(temp.parrallel_lines[2], temp.parrallel_lines[3]), Scalar(255, 0, 0), 2);
-		line(result, Point2f(temp.parrallel_lines[4], temp.parrallel_lines[5]), Point2f(temp.parrallel_lines[6], temp.parrallel_lines[7]), Scalar(255, 0, 0), 2);
-		// 画出水线
-		line(result, Point2f(temp.water_lines[0], temp.water_lines[1]), Point2f(temp.water_lines[2], temp.water_lines[3]), Scalar(0, 255, 0), 2);
-		// 画出数值
-		ostringstream ss;
-		ss << round(temp.water_number * 100) / 10;
-		string text = ss.str() + "cm";
-		int font_face = cv::FONT_HERSHEY_COMPLEX;
-		double font_scale = 1;
-		int thickness = 2;
-		int baseline;
-		//获取文本框的长宽  
-		Size text_size = cv::getTextSize(text, font_face, font_scale, thickness, &baseline);
-		Point2f temp_point((temp.points[temp.points.size() - 1])[0], (temp.points[temp.points.size() - 1])[1]);
-		if (temp_point.x < result.cols / 2)
-			temp_point.x = temp_point.x + 30;
-		else
-			temp_point.x = temp_point.x - 30 - text_size.width;
-		putText(result, text, temp_point, font_face, font_scale, cv::Scalar(0, 255, 255), thickness, 8, 0);
-		vector<float> temp1;
-		temp1.push_back(temp_point.x);
-		temp1.push_back(round(temp.water_number * 100) / 10);
-		temp_water_number.push_back(temp1);
-	}
-	// 读写图像
-	stable_sort(temp_water_number.begin(), temp_water_number.end(),
-		[](vector<float>a, vector<float>b) {return a[0] < b[0]; });
-	string s;
-	ostringstream ss;
-	for (int i = 0; i < temp_water_number.size(); ++i) {
-		ss << "=";
-		int temp= round((temp_water_number[i])[1]*10);
-		if (temp < 0) {
-			ss << "-";
-			temp = abs(temp);
-		}
-		ss << temp / 10;
-		ss << ",";
-		ss << temp % 10;
-	}
-	s = "result_" + name +ss.str()+ ".jpg";
-	imwrite(s, result);
-	//// 读写文件
-	//name = name + ".txt";
-	//stable_sort(temp_water_number.begin(), temp_water_number.end(),
-	//	[](vector<float>a, vector<float>b) {return a[0] < b[0]; });
-	//ofstream file(name);
-	//for (int i = 0; i < temp_water_number.size(); ++i) {
-	//	file << "=";
-	//	file << fixed << setprecision(1) << (temp_water_number[i])[1];
-	//}
-	//file.close();
-	//ofstream file(name);
-	//file.width(16);
-	//file.setf(ios::left);
-	//for (int i = 0; i < water.size(); ++i) {
-	//	water_result temp = *(water.begin() + i);
-	//	file << "水尺区域";
-	//	file << "第"<<(i + 1) <<"块"<< endl;
-	//	file << "水位" << endl;
-	//	file << round(temp.water_number * 100) / 10 << endl;
-	//	file << "水尺" << endl;
-	//	file << "x1";file << "y1";file << "x2";file << "y2";
-	//	for (int j = 0; j < temp.parrallel_lines.size(); ++j) {
-	//		if ((j%4)==0)
-	//			file << endl;
-	//		file << fixed << setprecision(2) << temp.parrallel_lines[j];
-	//	}
-	//	file << endl;
-	//	file << "水面线" << endl;
-	//	file << "x1"; file << "y1"; file << "x2"; file << "y2";
-	//	for (int j = 0; j < temp.water_lines.size(); ++j) {
-	//		if ((j % 4) == 0)
-	//			file << endl;
-	//		file << fixed << setprecision(2) << temp.water_lines[j];
-	//	}
-	//	file << endl;
-	//file.close();
+	string result_image = "result_" + name + ".jpg", result_txt="result_" + name + ".txt";
+	svaefile(im, image_name, water, result_image, result_txt);
 }
 
 void svaefile(Mat im, string image_name, vector<water_result> water, string result_image, string result_txt)
@@ -2784,9 +2698,32 @@ void svaefile(Mat im, string image_name, vector<water_result> water, string resu
 	stable_sort(temp_water_number.begin(), temp_water_number.end(),
 		[](vector<float>a, vector<float>b) {return a[0] < b[0]; });
 	ofstream file(result_txt);
-	for (int i = 0; i < temp_water_number.size(); ++i) {
-		file << "=";
-		file << fixed << setprecision(1) << (temp_water_number[i])[1];
+	//file.width(16);
+	//file.setf(ios::left);
+	for (int i = 0; i < water.size(); ++i) {
+		water_result temp = *(water.begin() + i);
+		file << "序号=";
+		file << (i + 1) <<";"<< endl;
+		file << "水位数=";
+		file << fixed << setprecision(1)<<round(temp.water_number * 100) / 10 << ";" << endl;
+		file << "水尺区域=";
+		for (int j = 0; j < temp.parrallel_lines.size(); ++j) {
+			file << fixed << setprecision(2) << temp.parrallel_lines[j];
+			if ((j % 4) == 3)
+				file << ";";
+			else
+				file << ",";
+		}
+		file << endl;
+		file << "水面线=";
+		for (int j = 0; j < temp.water_lines.size(); ++j) {
+			file << fixed << setprecision(2) << temp.water_lines[j] ;
+			if ((j % 4) == 3)
+				file << ";";
+			else
+				file << ",";
+		}
+		file << endl;
 	}
 	file.close();
 }
