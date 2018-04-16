@@ -2702,11 +2702,11 @@ void svaefile(Mat im, string image_name, vector<water_result> water, string resu
 	//file.setf(ios::left);
 	for (int i = 0; i < water.size(); ++i) {
 		water_result temp = *(water.begin() + i);
-		file << "序号=";
+		file << "No=";
 		file << (i + 1) <<";"<< endl;
-		file << "水位数=";
+		file << "WaterLevel=";
 		file << fixed << setprecision(1)<<round(temp.water_number * 100) / 10 << ";" << endl;
-		file << "水尺区域=";
+		file << "GuageArea=";
 		for (int j = 0; j < temp.parrallel_lines.size(); ++j) {
 			file << fixed << setprecision(2) << temp.parrallel_lines[j];
 			if ((j % 4) == 3)
@@ -2715,7 +2715,7 @@ void svaefile(Mat im, string image_name, vector<water_result> water, string resu
 				file << ",";
 		}
 		file << endl;
-		file << "水面线=";
+		file << "WaterLine=";
 		for (int j = 0; j < temp.water_lines.size(); ++j) {
 			file << fixed << setprecision(2) << temp.water_lines[j] ;
 			if ((j % 4) == 3)
