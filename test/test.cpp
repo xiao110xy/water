@@ -24,7 +24,6 @@ int main(int argc,void **agrv)
 	imgSrc = imread("12.jpg", CV_LOAD_IMAGE_ANYDEPTH | CV_LOAD_IMAGE_ANYCOLOR);
 	cvtColor(imgSrc, imgGray, CV_RGB2GRAY);//彩色图像转换为灰度图
 	im = imgGray.clone();
-	imgEdge = xy_Canny(im,(double)0, (double)255,3,true);
 	Edge_Detect(imgGray, 3);
 	g_nThresh_low = 0;//初始化低阈值值0
 	g_nThresh_high = 0;//初始化高阈值为0

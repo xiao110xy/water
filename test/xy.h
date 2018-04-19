@@ -1,10 +1,9 @@
 #pragma once
 #include "water_line.h"
-#include <map>
 
-Mat xy_Canny(Mat _src, double low_thresh, double high_thresh, int aperture_size, bool L2gradient);
 Mat Edge_Detect(Mat im,int aperture_size);
 vector<vector<vector<Point3f>>> select_pointline(Mat dx, Mat dy, vector<Point3f> points, bool flag);
 vector<Point3f> cluster_point(Mat score_image, float score_t, Point point,Mat flag,int number);
+vector<Point3f> cluster_point(Mat score_image, float score_t, int number);
 vector<Point3f> cluster_point(vector<Point3f> data, bool flag, Mat &flag_image);
 vector<vector<Point3f>> new_point_line1_line2(Mat dx,Mat dy,vector<Point3f> point, vector<Point3f> line1_point, vector<Point3f> line2_point,bool flag);
