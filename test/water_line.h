@@ -8,6 +8,7 @@
 #include <fstream> 
 #include <iomanip>
 #include <io.h>
+#include <map>
 struct water_result {
 	Mat data;
 	vector<float> parrallel_lines;

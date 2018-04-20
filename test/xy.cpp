@@ -18,11 +18,30 @@ Mat Edge_Detect(Mat im, int aperture_size)
 	Sobel(im, dx, CV_32F, 1, 0, aperture_size, 1, 0, cv::BORDER_REPLICATE);
 	Sobel(im, dy, CV_32F, 0, 1, aperture_size, 1, 0, cv::BORDER_REPLICATE);
 	// dy方向局部极大极小值 找出极小值，并进行处理
-	vector<Point3f> points1 = localmax_point_score(dx, dx.cols / 3, dx.cols / 3 * 2, 3, 0);
-	vector<Point3f> points2 = localmax_point_score(-dx, dx.cols / 3, dx.cols / 3 * 2, 3, 0);
+	vector<Point3f> points1 = localmax_point_score(dx, dx.cols / 3, dx.cols / 3 * 2,3, 0);
+	vector<Point3f> points2 = localmax_point_score(-dx, dx.cols / 3, dx.cols / 3 * 2,3, 0);
+	Mat temp_dx = dx.clone();
+	temp_dx.colRange(0, dx.cols / 3).setTo(0);
+	temp_dx.colRange(dx.cols / 3*2, dx.cols).setTo(0);
+	
+	//test_im = im.clone();
+	//test_im = draw_point(test_im,points1, Scalar(255, 0, 0));
+	//test_im = draw_point(test_im,points2, Scalar(0, 0,255));
+
+	//vector<vector<Point3f>> temp_vvp3f;
+	//test_im = im.clone();
+	//float scale = 0.99;
+	//temp_vvp3f = cluster_point(temp_dx, 50, 4);
+	//for (auto i:temp_vvp3f)
+	//	test_im = draw_point(test_im, i, Scalar(0, 255, 0));
+	//temp_vvp3f = cluster_point(-temp_dx, 50, 4);
+	//for (auto i : temp_vvp3f)
+	//	test_im = draw_point(test_im, i, Scalar(0, 0, 255));
+	//
 	// 筛选points
-	vector<vector<vector<Point3f>>> E_area1 = select_pointline(dx, dy, points1, true);
-	vector<vector<vector<Point3f>>> E_area2 = select_pointline(dx, dy, points2, false);
+	Mat flag_image = Mat::zeros(im.size(), CV_8UC1);
+	vector<vector<vector<Point3f>>> E_area1 = select_pointline(dx, dy, points1, true,flag_image);
+	vector<vector<vector<Point3f>>> E_area2 = select_pointline(dx, dy, points2, false,flag_image);
 
 	Mat temp[3];
 	temp[0] = data.clone(); temp[1] = data.clone(); temp[2] = data.clone();
@@ -39,6 +58,9 @@ Mat Edge_Detect(Mat im, int aperture_size)
 				test_im.at<Vec3b>(k.y, k.x).val[2] = rgb[j].val[2];
 			}
 	}
+	rgb[1] = Scalar(0, 255, 0);
+	rgb[2] = Scalar(0, 0, 255);
+	rgb[0] = Scalar(255, 0, 0);
 	for (auto i : E_area2) {
 		for (int j = 0; j<3; ++j)
 			for (auto k : i[j]) {
@@ -54,18 +76,19 @@ Mat Edge_Detect(Mat im, int aperture_size)
 	return Mat();
 }
 
-vector<vector<vector<Point3f>>> select_pointline(Mat dx, Mat dy, vector<Point3f> points, bool flag)
+vector<vector<vector<Point3f>>> select_pointline(Mat dx, Mat dy, vector<Point3f> points, bool flag,Mat flag_image)
 {
+	float point_score_t = 50;
 	Mat point_scoreimage = flag ? dx.clone() : -dx.clone();
 	Mat line_scoreimage = dy.clone();
 	vector<vector<vector<Point3f>>> result;
 	int dety = line_scoreimage.cols / 6;
 	dety = dety < 3 ? 3 : dety;
 	int detx = line_scoreimage.cols / 4;
-	Mat flag_image = Mat::zeros(point_scoreimage.size(), CV_8UC1);
 	for (auto &i : points) {
-		if (i.y<3 || i.y>point_scoreimage.rows - 4)
+		if (i.y<3 || i.y>point_scoreimage.rows - 4|| point_scoreimage.at<float>(i.y,i.x)<point_score_t)
 			continue;
+		vector<vector<Point3f>> temp_vvp3f;
 		vector<Point3f> temp_point, temp_line1, temp_line2;
 		float score_t = i.z*0.5;
 		Mat temp_flag_image = flag_image.clone();
@@ -84,46 +107,64 @@ vector<vector<vector<Point3f>>> select_pointline(Mat dx, Mat dy, vector<Point3f>
 			continue;
 		y1 = i.y - dety >= 0 ? i.y - dety : 0;
 		y2 = i.y + dety <= line_scoreimage.rows ? i.y + dety : line_scoreimage.rows;
-		temp_data = -line_scoreimage(Range(y1, i.y), Range(x1, x2)).clone();
+		temp_data = -line_scoreimage(Range(y1, i.y+3), Range(x1, x2)).clone();
 		minMaxLoc(temp_data, NULL, NULL, NULL, &index);
-		float score_t1 = temp_data.at<float>(index.y, index.x)*0.5;
-		temp_line1 = cluster_point(-line_scoreimage.clone(), score_t, Point(index.x + x1, index.y + y1), temp_flag_image.clone(), 8);
+		float score_t1 = temp_data.at<float>(index.y, index.x)*0.4;
+		temp_vvp3f = cluster_point(temp_data, score_t1, 8, index);
+		if (temp_vvp3f.size() < 1)
+			continue;
+		temp_line1 = cluster_point(-line_scoreimage.clone(), score_t1, Point(index.x + x1, index.y + y1), temp_flag_image.clone(), 8);
 		temp_line1 = cluster_point(temp_line1, false, temp_flag_image);
 		if (temp_line1.size() < 1)
 			continue;
-		temp_data = line_scoreimage(Range(i.y + 1, y2), Range(x1, x2)).clone();
+		temp_data = line_scoreimage(Range(i.y -2, y2), Range(x1, x2)).clone();
 		minMaxLoc(temp_data, NULL, NULL, NULL, &index);
-		float score_t2 = temp_data.at<float>(index.y, index.x)*0.5;
-		temp_line2 = cluster_point(line_scoreimage.clone(), score_t2, Point(index.x + x1, index.y + i.y + 1), temp_flag_image.clone(), 8);
+		float score_t2 = temp_data.at<float>(index.y, index.x)*0.4;
+		temp_vvp3f  =cluster_point(temp_data, score_t2, 8, index);
+		if (temp_vvp3f.size() < 1)
+			continue;
+		temp_line2 = cluster_point(line_scoreimage.clone(), score_t2, Point(index.x + x1, index.y + i.y -2), temp_flag_image.clone(), 8);
 		temp_line2 = cluster_point(temp_line2, false, temp_flag_image);
 		if (temp_line2.size() < 1)
 			continue;
+
 		vector<vector<Point3f>> temp_result = new_point_line1_line2(dx, dy, temp_point, temp_line1, temp_line2, flag);
 		if (temp_result.size() != 3)
 			continue;
 		if (temp_result[0].size()>temp_result[1].size() || temp_result[0].size()>temp_result[2].size())
 			continue;
-		int temp_value = 255;
-		for (auto i : temp_result) {
-			for (auto j : i)
-				flag_image.at<uchar>(j.y, j.x) = temp_value;
-			temp_value -= 100;
+		int temp_value = result.size()+1;
+		vector<Point> draw_temp;
+		draw_temp.push_back(Point((temp_result[0])[0].x, (temp_result[0])[0].y));
+		draw_temp.push_back(Point((temp_result[0])[temp_result[0].size()-1].x, (temp_result[0])[temp_result[0].size() - 1].y));
+
+		//
+		point_scoreimage.rowRange((temp_result[0])[0].y, (temp_result[0])[temp_result[0].size() - 1].y+1).setTo(0);
+
+		if (flag) {
+			draw_temp.push_back(Point((temp_result[2])[0].x, (temp_result[2])[0].y));
+			draw_temp.push_back(Point((temp_result[1])[0].x, (temp_result[1])[0].y));
 		}
+		else {
+			draw_temp.push_back(Point((temp_result[2])[temp_result[2].size() - 1].x, (temp_result[2])[temp_result[2].size() - 1].y));
+			draw_temp.push_back(Point((temp_result[1])[temp_result[1].size() - 1].x, (temp_result[1])[temp_result[1].size() - 1].y));
+		}
+		fillPoly(flag_image, vector<vector<Point>>{draw_temp}, Scalar(temp_value));
 		result.push_back(temp_result);
 	}
 	return result;
 }
 
-vector<Point3f> cluster_point(Mat score_image, float score_t, Point point, Mat flag, int number)
+vector<Point3f> cluster_point(Mat score_image, float score_t, Point point, Mat flag_image, int number)
 {
 	if (score_t<50)
 		return vector<Point3f>();
 	vector<Point3f> result;
 	int x = point.x;
 	int y = point.y;
-	if (x<0 || y<0 || x>score_image.cols - 1 || y>score_image.rows - 1 || flag.at<uchar>(y, x) != 0)
+	if (x<0 || y<0 || x>score_image.cols - 1 || y>score_image.rows - 1 || flag_image.at<uchar>(y, x) != 0)
 		return vector<Point3f>();
-	flag.at<uchar>(y, x) = 1;
+	flag_image.at<uchar>(y, x) = 255;
 	Point3f temp_point;
 	temp_point.x = (float)point.x;
 	temp_point.y = (float)point.y;
@@ -133,45 +174,64 @@ vector<Point3f> cluster_point(Mat score_image, float score_t, Point point, Mat f
 	// 四邻域
 	result.push_back(temp_point);
 	vector<Point3f> temp;
-	temp = cluster_point(score_image, score_t, Point(point.x, point.y - 1), flag, number);
+	temp = cluster_point(score_image, score_t, Point(point.x, point.y - 1), flag_image, number);
 	result.insert(result.end(), temp.begin(), temp.end());
-	temp = cluster_point(score_image, score_t, Point(point.x, point.y + 1), flag, number);
+	temp = cluster_point(score_image, score_t, Point(point.x, point.y + 1), flag_image, number);
 	result.insert(result.end(), temp.begin(), temp.end());
-	temp = cluster_point(score_image, score_t, Point(point.x + 1, point.y), flag, number);
+	temp = cluster_point(score_image, score_t, Point(point.x + 1, point.y), flag_image, number);
 	result.insert(result.end(), temp.begin(), temp.end());
-	temp = cluster_point(score_image, score_t, Point(point.x - 1, point.y), flag, number);
+	temp = cluster_point(score_image, score_t, Point(point.x - 1, point.y), flag_image, number);
 	if (number > 4) {
 		result.insert(result.end(), temp.begin(), temp.end());
-		temp = cluster_point(score_image, score_t, Point(point.x - 1, point.y - 1), flag, number);
+		temp = cluster_point(score_image, score_t, Point(point.x - 1, point.y - 1), flag_image, number);
 		result.insert(result.end(), temp.begin(), temp.end());
-		temp = cluster_point(score_image, score_t, Point(point.x + 1, point.y - 1), flag, number);
+		temp = cluster_point(score_image, score_t, Point(point.x + 1, point.y - 1), flag_image, number);
 		result.insert(result.end(), temp.begin(), temp.end());
-		temp = cluster_point(score_image, score_t, Point(point.x + 1, point.y + 1), flag, number);
+		temp = cluster_point(score_image, score_t, Point(point.x + 1, point.y + 1), flag_image, number);
 		result.insert(result.end(), temp.begin(), temp.end());
-		temp = cluster_point(score_image, score_t, Point(point.x - 1, point.y + 1), flag, number);
+		temp = cluster_point(score_image, score_t, Point(point.x - 1, point.y + 1), flag_image, number);
 		result.insert(result.end(), temp.begin(), temp.end());
 	}
 	return result;
 }
-vector<Point3f> cluster_point(Mat score_image, float score_t, int number)
+vector<vector<Point3f>> cluster_point(Mat score_image, float score_t, int number, Point &index)
 {
 	vector<Point> points;
 	for (int i = 0; i < score_image.total(); ++i) {
 		if (*(score_image.ptr<float>(0)+i) > score_t) {
-			points.push_back(Point(i / score_image.cols, i%score_image.cols));
+			points.push_back(Point(i % score_image.cols, i/score_image.cols));
 		}
 	}
 	Mat flag = Mat::zeros(score_image.size(),CV_8U);
-	vector<Point3f> result;
+	vector<vector<Point3f>> result;
 	for (auto i : points) {
 		vector<Point3f> temp=cluster_point(score_image, score_t, i, flag, number);
-		if (temp.size() > result.size())
-			result = temp;
+		if (temp.size()>0)
+			result.push_back(temp);
 	}
+	stable_sort(result.begin(), result.end(),
+		[](vector<Point3f> a, vector<Point3f> b) {return a.size() > b.size(); });
+	if (result.size()<1)
+		return result;
+	vector<Point3f> temp_result(result[0]);
+	stable_sort(temp_result.begin(), temp_result.end(),
+		[](Point3f a, Point3f b) {return a.z > b.z; });
+	index.x = temp_result[0].x;
+	index.y = temp_result[0].y;
+	return result;
+}
+vector<vector<Point3f>> cluster_point(Mat score_image, float score_t, int number)
+{
+	vector<vector<Point3f>> result;
+	Point index;
+	result = cluster_point(score_image, score_t, number, index);
 	return result;
 }
 vector<Point3f> cluster_point(vector<Point3f> data, bool flag, Mat &flag_image)
 {
+	Mat test_im = flag_image.clone();
+	for (auto i:data)
+		test_im.at<uchar>(i.y, i.x) = flag ? 255 : 125;
 	if (flag) {
 		for (auto &i : data)
 			std::swap(i.x, i.y);
@@ -211,7 +271,7 @@ vector<vector<Point3f>> new_point_line1_line2(Mat dx, Mat dy, vector<Point3f> po
 {
 	// 竖直直线的x坐标
 	int x = point[0].x, y = point[0].y;
-	//int x = 0;
+	//int x=0,y=0;
 	//map<int,int> temp;
 	//int max = 0;
 	//for (auto i : point) {
@@ -226,8 +286,11 @@ vector<vector<Point3f>> new_point_line1_line2(Mat dx, Mat dy, vector<Point3f> po
 	//		x = i.first;
 	//	if (i.second == max && !flag&&i.first > x)
 	//		x = i.first;
-
 	//}
+	//float score_z=-1;
+	//for (auto i : point)
+	//	if (i.x == x && score_z < i.z)
+	//		y = i.y;
 	// 直线拟合
 	vector<Point2f> temp_f_point;
 	Point2f point_first(9999, 0), point_end(-9999, 0);
@@ -238,12 +301,12 @@ vector<vector<Point3f>> new_point_line1_line2(Mat dx, Mat dy, vector<Point3f> po
 		if (i.x <= x && flag) {
 			temp_line1_point.push_back(Point((int)i.x, (int)i.y));
 			mindx1 = mindx1 < abs(i.x - x) ? mindx1 : abs(i.x - x);
-			mindy1 = mindy1 < abs(i.y - y) ? mindy1 : abs(i.y - y);
+			//mindy1 = mindy1 <y - i.y? mindy1 : y - i.y;
 		}
 		if (i.x >= x && !flag) {
 			temp_line1_point.push_back(Point((int)i.x, (int)i.y));
-			mindx1 = mindx1 < abs(i.x - x) ? mindx1 : abs(i.x - x);
-			mindy1 = mindy1 < abs(i.y - y) ? mindy1 : abs(i.y - y);
+			mindx1 = mindx1 <abs(i.x - x) ? mindx1 : abs(i.x - x);
+			//mindy1 = mindy1 < y - i.y ? mindy1 : y - i.y;
 		}
 	}
 	if (temp_line1_point.size()<2 || mindx1>3)
@@ -254,19 +317,17 @@ vector<vector<Point3f>> new_point_line1_line2(Mat dx, Mat dy, vector<Point3f> po
 		if (i.x <= x && flag) {
 			temp_line2_point.push_back(Point((int)i.x, (int)i.y));
 			mindx2 = mindx2 < abs(i.x - x) ? mindx2 : abs(i.x - x);
-			mindy2 = mindy2 < abs(i.y - y) ? mindy2 : abs(i.y - y);
+			//mindy2 = mindy2 < i.y - y ? mindy2 : i.y - y;
 
 		}
 
 		if (i.x >= x && !flag) {
 			temp_line2_point.push_back(Point((int)i.x, (int)i.y));
 			mindx2 = mindx2 < abs(i.x - x) ? mindx2 : abs(i.x - x);
-			mindy2 = mindy2 < abs(i.y - y) ? mindy2 : abs(i.y - y);
+			//mindy2 = mindy2 < i.y - y ? mindy2 : i.y - y;
 		}
 	}
 	if (temp_line2_point.size()<2 || mindx2>3)
-		return vector<vector<Point3f>>();
-	if (abs(mindy2 - mindy1)>8)
 		return vector<vector<Point3f>>();
 	//
 	fitLine(temp_line1_point, line1_para, CV_DIST_FAIR, 0, 1e-2, 1e-2);
@@ -314,6 +375,8 @@ vector<vector<Point3f>> new_point_line1_line2(Mat dx, Mat dy, vector<Point3f> po
 		point_first = temp_line1_point[0];
 		point_end = temp_line2_point[0];
 	}
+	if (y - point_first.y < 0 || y - point_end.y>0|| point_end.y- point_first.y<3)
+		return vector<vector<Point3f>>();
 	temp_point = get_line_point(point_first, point_end);
 	vector<vector<Point3f>> temp_result;
 	point.clear();

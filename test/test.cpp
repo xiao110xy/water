@@ -21,7 +21,7 @@ void on_Trackbar(int, void*)
 int main(int argc,void **agrv)
 {
 
-	imgSrc = imread("12.jpg", CV_LOAD_IMAGE_ANYDEPTH | CV_LOAD_IMAGE_ANYCOLOR);
+	imgSrc = imread("6.jpg", CV_LOAD_IMAGE_ANYDEPTH | CV_LOAD_IMAGE_ANYCOLOR);
 	cvtColor(imgSrc, imgGray, CV_RGB2GRAY);//彩色图像转换为灰度图
 	im = imgGray.clone();
 	Edge_Detect(imgGray, 3);
