@@ -20,11 +20,21 @@ void on_Trackbar(int, void*)
 
 int main(int argc,void **agrv)
 {
-
+	
+	//for (int i = 1; i < 9; ++i) {
+	//	ostringstream  ss;
+	//	ss << i;
+	//	string name = ss.str();
+	//	imgSrc = imread(name+".jpg", CV_LOAD_IMAGE_ANYDEPTH | CV_LOAD_IMAGE_ANYCOLOR);
+	//	cvtColor(imgSrc, imgGray, CV_RGB2GRAY);//彩色图像转换为灰度图
+	//	im = imgGray.clone();
+	//	Mat temp = Edge_Detect(imgGray, 3);
+	//	imwrite(name + ".png", temp);
+	//}
 	imgSrc = imread("6.jpg", CV_LOAD_IMAGE_ANYDEPTH | CV_LOAD_IMAGE_ANYCOLOR);
 	cvtColor(imgSrc, imgGray, CV_RGB2GRAY);//彩色图像转换为灰度图
 	im = imgGray.clone();
-	Edge_Detect(imgGray, 3);
+	Edge_Detect(imgSrc, 3);
 	g_nThresh_low = 0;//初始化低阈值值0
 	g_nThresh_high = 0;//初始化高阈值为0
 
