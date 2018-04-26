@@ -23,26 +23,11 @@ Mat Edge_Detect(Mat im, int aperture_size)
 	Mat temp_dx = dx.clone();
 	temp_dx.colRange(0, dx.cols / 3).setTo(0);
 	temp_dx.colRange(dx.cols / 3*2, dx.cols).setTo(0);
-	
-	//test_im = im.clone();
-	//test_im = draw_point(test_im,points1, Scalar(255, 0, 0));
-	//test_im = draw_point(test_im,points2, Scalar(0, 0,255));
-
-	//vector<vector<Point3f>> temp_vvp3f;
-	//test_im = im.clone();
-	//float scale = 0.99;
-	//temp_vvp3f = cluster_point(temp_dx, 50, 4);
-	//for (auto i:temp_vvp3f)
-	//	test_im = draw_point(test_im, i, Scalar(0, 255, 0));
-	//temp_vvp3f = cluster_point(-temp_dx, 50, 4);
-	//for (auto i : temp_vvp3f)
-	//	test_im = draw_point(test_im, i, Scalar(0, 0, 255));
-	//
 	// 筛选points
 	Mat flag_image = Mat::zeros(data.size(), CV_8UC1);
-	vector<vector<vector<Point3f>>> E_area1 = select_pointline(dx, dy, points1, true,flag_image);
-	vector<vector<vector<Point3f>>> E_area2 = select_pointline(dx, dy, points2, false,flag_image);
-	
+	vector<vector<vector<Point3f>>> E_area1 = get_pointline(dx, dy, points1, true,flag_image);
+	vector<vector<vector<Point3f>>> E_area2 = get_pointline(dx, dy, points2, false,flag_image);
+	vector<vector<vector<Point3f>>> rest_point_line = select_point_line(E_area1, E_area2);
 	Mat temp[3];
 	temp[0] = data.clone(); temp[1] = data.clone(); temp[2] = data.clone();
 	merge(temp, 3, test_im);
@@ -69,7 +54,17 @@ Mat Edge_Detect(Mat im, int aperture_size)
 				test_im.at<Vec3b>(k.y, k.x).val[2] = rgb[j].val[2];
 			}
 	}
-
+	rgb[0] = Scalar(0, 255, 0);
+	rgb[1] = Scalar(0, 255, 255);
+	rgb[2] = Scalar(255,255, 0);
+	for (auto i : rest_point_line) {
+		for (int j = 0; j<3; ++j)
+			for (auto k : i[j]) {
+				test_im.at<Vec3b>(k.y, k.x).val[0] = rgb[j].val[0];
+				test_im.at<Vec3b>(k.y, k.x).val[1] = rgb[j].val[1];
+				test_im.at<Vec3b>(k.y, k.x).val[2] = rgb[j].val[2];
+			}
+	}
 	// 去除非中心区域
 	get_E_area(im, E_area1, E_area2, dx, dy);
 	return Mat();
@@ -101,7 +96,7 @@ Mat draw_part_E(Mat im, vector<vector<vector<Point3f>>> data)
 	return show_im;
 }
 
-vector<vector<vector<Point3f>>> select_pointline(Mat dx, Mat dy, vector<Point3f> points, bool flag,Mat flag_image)
+vector<vector<vector<Point3f>>> get_pointline(Mat dx, Mat dy, vector<Point3f> points, bool flag,Mat flag_image)
 {
 	Mat test_im;
 
@@ -500,6 +495,55 @@ vector<vector<Point3f>> new_point_line1_line2(Mat dx, Mat dy, vector<Point3f> po
 	return temp_result;
 }
 
+vector<vector<vector<Point3f>>> select_point_line(vector<vector<vector<Point3f>>> &left_e, vector<vector<vector<Point3f>>> &right_e)
+{
+	vector<vector<vector<Point3f>>> data,temp_part,rest_point_line;
+	data.insert(data.end(), left_e.begin(), left_e.end());
+	data.insert(data.end(), right_e.begin(), right_e.end());
+	stable_sort(data.begin(), data.end(),
+		[](vector<vector<Point3f>> a, vector<vector<Point3f>> b) {return (a[0])[0].y < (b[0])[0].y; });
+	temp_part.clear();
+	for (auto i :left_e) {
+		vector<vector<Point3f>> temp = i;
+		float y1, y2;
+		y1 = (i[0])[0].y - 4 * i[0].size();
+		y2 = (i[0])[i[0].size() - 1].y + 4 * i[0].size();
+		vector<vector<vector<Point3f>>> temp_data;
+		for (auto j : data) {
+			if ((j[0])[0].y > y1 && (j[0])[j[0].size() - 1].y < y2) {
+				if (abs((j[0])[0].x - (i[0])[0].x) < 2)
+					temp_data.push_back(j);
+			}
+		}
+		if (temp_data.size() < 2) {
+			rest_point_line.push_back(i);
+			continue;
+		}
+		temp_part.push_back(i);
+	}
+	left_e = temp_part;
+	temp_part.clear();
+	for (auto i :right_e) {
+		float y1, y2;
+		y1 = (i[0])[0].y-4* i[0].size();
+		y2 = (i[0])[i[0].size()-1].y+4* i[0].size();
+		vector<vector<vector<Point3f>>> temp_data;
+		for (auto j : data) {
+			if ((j[0])[0].y > y1 && (j[0])[j[0].size() - 1].y < y2) {
+				if (abs((j[0])[0].x - (i[0])[0].x) < 2)
+					temp_data.push_back(j);
+			}
+		}
+		if (temp_data.size() < 2) {
+			rest_point_line.push_back(i);
+			continue;
+		}
+		temp_part.push_back(i);
+	}
+	right_e = temp_part;
+	return rest_point_line;
+}
+
 void get_E_area(Mat im, vector<vector<vector<Point3f>>> left_e, vector<vector<vector<Point3f>>> right_e, Mat dx, Mat dy)
 {
 	vector<Point2f> x_points;
@@ -515,24 +559,83 @@ void get_E_area(Mat im, vector<vector<vector<Point3f>>> left_e, vector<vector<ve
 	}
 	Vec4f line_para;
 	fitLine(x_points, line_para, CV_DIST_FAIR, 0, 1e-2, 1e-2);
-	// 寻找确定的E区域
+	// 制作标记
+	Mat flag_e = Mat::zeros(Size(4,im.rows),CV_32FC1);
+	for (int i = 0; i < left_e.size();++i) {
+		vector<Point3f> temp = (left_e[i])[0];
+		flag_e(Range((int)temp[0].y, (int)temp[temp.size() - 1].y), Range(0, 1)) = 255;
+		flag_e(Range((int)temp[0].y, (int)temp[temp.size() - 1].y), Range(1, 2)) = i;
+		flag_e(Range((int)temp[0].y, (int)temp[temp.size() - 1].y), Range(2, 3)) = 1;
+	}
+	for (int i = 0; i < right_e.size(); ++i) {
+		vector<Point3f> temp = (right_e[i])[0];
+		flag_e(Range((int)temp[0].y, (int)temp[temp.size() - 1].y), Range(0, 1)) = -255;
+		flag_e(Range((int)temp[0].y, (int)temp[temp.size() - 1].y), Range(1, 2)) = i;
+		flag_e(Range((int)temp[0].y, (int)temp[temp.size() - 1].y), Range(2, 3)) = 1;
+	}
+	// 推测缺失的E
+	for (int i = 1; i < im.rows; ++i) {
+		if (abs(flag_e.at<float>(i, 0)) < 0.5)
+			continue;
+		vector<Point3f> temp = flag_e.at<float>(i, 0) > 0.5 ? (left_e[flag_e.at<float>(i, 1)])[0] : (right_e[flag_e.at<float>(i, 1)])[0];
+		float score_t = -9999;
+		for (auto i : temp) {
+			score_t = score_t > abs(i.z) ? score_t: abs(i.z) ;
+		}
+		score_t = score_t * .5 > 100 ?  score_t * 0.5:100;
+		vector<Point3f> temp_dx;
+		int y1, y2;
+		// 上侧
+		y1 = i - 2*temp.size();
+		y1 = y1 < 0 ? 0 : y1;
+		y2 = round(i - 0.5 * temp.size())+1;
+		y2 = y2 >y1 ? y2:y1;
+		for (int j = y2-1; j >= y1; --j) {
+			int x = (int)round((j - line_para[3]) * line_para[0] / line_para[1] + line_para[2]);
+			float score = dx.at<float>(j, x);
+			if (abs(score) < score_t)
+				continue;
+			if (abs(flag_e.at<float>(j, 0))>0.5)
+				break;
+			if (temp_dx.size() > 0 && temp_dx[temp_dx.size() - 1].y - j > 2)
+				break;
+			temp_dx.push_back(Point3f(x, j, score));
+		}
+		if (temp_dx.size() <= 1)
+			continue;
+		flag_e(Range(temp_dx[temp_dx.size() - 1].y, temp_dx[0].y + 1), Range(0, 1)).setTo(temp_dx[0].z > 0 ? 255 : -255);
+		flag_e(Range(temp_dx[temp_dx.size() - 1].y, temp_dx[0].y + 1), Range(1, 2)).setTo(-1);
+		flag_e(Range(temp_dx[temp_dx.size() - 1].y, temp_dx[0].y + 1), Range(2, 3)).setTo(flag_e.at<float>(i, 2)*0.5);
+		flag_e.at<float>(i, 2) += 0.5;
+		// 下侧
+		temp_dx.clear();
+		y2 = i + 2 * temp.size();
+		y2 = y2 <=im.rows ? y2 : im.rows;
+		y1 = round(i + 0.5 * temp.size());
+		y1 = y1 < y2 ?  y1:y2;
+		for (int j = y1; j <y2; ++j) {
+			int x = (int)round((j - line_para[3]) * line_para[0] / line_para[1] + line_para[2]);
+			float score = dx.at<float>(j, x);
+			if (abs(score) < score_t)
+				continue;
+			if (abs(flag_e.at<float>(j, 0))>0.5)
+				break;
+			if (temp_dx.size() > 0 && temp_dx[temp_dx.size() - 1].y - j > 2)
+				break;
+			temp_dx.push_back(Point3f(x, j, score));
+		}
+		if (temp_dx.size() <=1)
+			continue;
+		flag_e(Range(temp_dx[0].y, temp_dx[temp_dx.size() - 1].y + 1), Range(0, 1)).setTo(temp_dx[0].z > 0 ? 255 : -255);
+		flag_e(Range(temp_dx[0].y, temp_dx[temp_dx.size() - 1].y + 1), Range(1, 2)).setTo(-1);
+		flag_e(Range(temp_dx[0].y, temp_dx[temp_dx.size() - 1].y + 1), Range(2, 3)).setTo(flag_e.at<float>(i, 2)*0.5);
+		flag_e.at<float>(i, 2) += 0.5;
+
+	}
 	// 根据确定的E区域进行推断
 	// 
 	// 寻找左右E靠近相交部分
-	vector<vector<vector<Point3f>>> temp_result, result;
-	vector<vector<float>> flag_v;
-	for (auto i:left_e)
-		for (auto j : right_e) {
-			vector<Point3f> y1 =i[0], y2=j[0];
-			Point3f y1_1= y1[0], y1_2 = *(y1.end()-1), y2_1= y2[0], y2_2= *(y2.end() - 1);
-			bool flag1 = abs(y1_2.y - y2_1.y) > ((y1.size() > y2.size() ? y1.size() : y2.size())*0.5);
-			bool flag2 = abs(y1_1.x - y2_1.x) > ((im.cols / 12)>3?(im.cols/12):3);
-			if (flag1||flag2)
-				continue;
-			vector<float> temp(2);
-			temp[0] = y1_2.y; temp[1] = y2_1.y;
-			flag_v.push_back(temp);
-		}
+
 
 
 }

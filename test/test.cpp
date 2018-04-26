@@ -31,7 +31,7 @@ int main(int argc,void **agrv)
 	//	Mat temp = Edge_Detect(imgGray, 3);
 	//	imwrite(name + ".png", temp);
 	//}
-	imgSrc = imread("6.jpg", CV_LOAD_IMAGE_ANYDEPTH | CV_LOAD_IMAGE_ANYCOLOR);
+	imgSrc = imread("2.png", CV_LOAD_IMAGE_ANYDEPTH | CV_LOAD_IMAGE_ANYCOLOR);
 	cvtColor(imgSrc, imgGray, CV_RGB2GRAY);//彩色图像转换为灰度图
 	im = imgGray.clone();
 	Edge_Detect(imgSrc, 3);
