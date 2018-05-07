@@ -12,8 +12,8 @@ Mat Edge_Detect(Mat im, int aperture_size)
 	else
 		data = im.clone();
 	// BORDER_REPLICATE 表示当卷积点在图像的边界时，原始图像边缘的像素会被复制，并用复制的像素扩展原始图的尺寸  
-	// 计算x方向的sobel方向导数，计算结果存在dx中  
-	// 计算y方向的sobel方向导数，计算结果存在dy中  
+	// 计算x方向的sobel方向导数，计算结果存在dx中
+	// 计算y方向的sobel方向导数，计算结果存在dy中
 	Mat dx, dy;
 	Sobel(data, dx, CV_32F, 1, 0, aperture_size, 1, 0, cv::BORDER_REPLICATE);
 	Sobel(data, dy, CV_32F, 0, 1, aperture_size, 1, 0, cv::BORDER_REPLICATE);
@@ -603,10 +603,12 @@ void get_E_area(Mat im, vector<vector<vector<Point3f>>> left_e, vector<vector<ve
 		}
 		if (temp_dx.size() <= 1)
 			continue;
-		flag_e(Range(temp_dx[temp_dx.size() - 1].y, temp_dx[0].y + 1), Range(0, 1)).setTo(temp_dx[0].z > 0 ? 255 : -255);
-		flag_e(Range(temp_dx[temp_dx.size() - 1].y, temp_dx[0].y + 1), Range(1, 2)).setTo(-1);
-		flag_e(Range(temp_dx[temp_dx.size() - 1].y, temp_dx[0].y + 1), Range(2, 3)).setTo(flag_e.at<float>(i, 2)*0.5);
-		flag_e.at<float>(i, 2) += 0.5;
+		Point3f max_value_point;
+		for (auto i : temp_dx) {
+			if (abs(max_value_point.z) < abs(i.z))
+				max_value_point = i;
+		}
+		flag_e.at<float>(max_value_point.y, 0) = max_value_point.z > 0 ? 100 : -100;
 		// 下侧
 		temp_dx.clear();
 		y2 = i + 2 * temp.size();
@@ -626,14 +628,14 @@ void get_E_area(Mat im, vector<vector<vector<Point3f>>> left_e, vector<vector<ve
 		}
 		if (temp_dx.size() <=1)
 			continue;
-		flag_e(Range(temp_dx[0].y, temp_dx[temp_dx.size() - 1].y + 1), Range(0, 1)).setTo(temp_dx[0].z > 0 ? 255 : -255);
-		flag_e(Range(temp_dx[0].y, temp_dx[temp_dx.size() - 1].y + 1), Range(1, 2)).setTo(-1);
-		flag_e(Range(temp_dx[0].y, temp_dx[temp_dx.size() - 1].y + 1), Range(2, 3)).setTo(flag_e.at<float>(i, 2)*0.5);
-		flag_e.at<float>(i, 2) += 0.5;
-
+		max_value_point.z = 0;
+		for (auto i : temp_dx) {
+			if (abs(max_value_point.z) < abs(i.z))
+				max_value_point = i;
+		}
+		flag_e.at<float>(max_value_point.y, 0) = max_value_point.z > 0 ? 100 : -100;
 	}
 	// 根据确定的E区域进行推断
-	// 
 	// 寻找左右E靠近相交部分
 
 

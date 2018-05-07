@@ -64,10 +64,6 @@ int main(int argc, char** argv)
 		cout << "please input image name\n";
 		return 0;
 	}
-	if (argc != 2) {
-		cout << "please only input image name\n";
-		return 0;
-	}
 	string image_name(argv[1]);
 	string result_image, result_txt;
 	Mat image = imread(image_name, IMREAD_COLOR);
@@ -76,8 +72,16 @@ int main(int argc, char** argv)
 		cout << " No image data \n";
 		return -1;
 	}
-	vector<water_result> water = segement_area(image, model);
-	svaefile(image, image_name, water);
+	if (argc == 2) {
+		vector<water_result> water = segement_area(image, model);
+		svaefile(image, image_name, water);
+	}
+	if (argc == 3) {
+	/*	string roi_name(arcg)
+		fstream outfile;*/
+		vector<water_result> water = segement_area(image, model);
+		svaefile(image, image_name, water);
+	}
 
 
 
