@@ -11,7 +11,7 @@ int main(int argc, char** argv)
 {
 	vector<vector<Mat>> model;
 	DEBUG_IF(1) {
-		if (argc == 3) {
+		if (argc == 4) {
 			string model_path(argv[2]);
 			for (int i = 0; i < 10; ++i) {
 				stringstream stream;
@@ -77,9 +77,37 @@ int main(int argc, char** argv)
 		svaefile(image, image_name, water);
 	}
 	if (argc == 3) {
-	/*	string roi_name(arcg)
-		fstream outfile;*/
-		vector<water_result> water = segement_area(image, model);
+		vector<vector<int>> roi;
+		fstream roi_file(argv[2]);
+		while (!roi_file.eof())
+		{
+			int n = 0;
+			vector<int> temp_roi(4,0);
+			string temp_name;
+			getline(roi_file, temp_name);
+			if (temp_name[0] < 48 && temp_name[0]>57)
+				break;
+			for (int i = 0; i < temp_name.size();++i) {
+				int temp_value = 0;
+				int j=0;
+				for (j = i; j < temp_name.size(); ++j) {
+					if (temp_name[j] >= 48 && temp_name[j] <= 57) {
+						temp_value = temp_value * 10 + temp_name[j] - 48;
+					}
+					else {
+						break;
+					}
+				}
+				temp_roi[n] = temp_value;
+				++n;
+				i = j;
+			}
+			if (n==4)
+				roi.push_back(temp_roi);
+		}
+		// 取部分进行处理
+
+		vector<water_result> water = segement_roi_area(image, model, roi);
 		svaefile(image, image_name, water);
 	}
 

@@ -48,9 +48,11 @@ vector<Matx<float, 6, 1>> intersect_line(vector<Matx<float, 6, 1>> lines1, vecto
 bool pnpoly(int nvert, float *vertx, float *verty, float testx, float testy);
 
 vector<water_result> segement_area(Mat I, vector<vector<Mat>> &model);
+vector<water_result> segement_roi_area(Mat I, vector<vector<Mat>> &model, vector<vector<int>> roi);
 vector<Matx<float, 12, 1>>  extend_line(Mat I, vector<Matx<float, 12, 1>> parallel_lines);
 vector<Matx<float, 12, 1>>  subtract_iou(Mat I,vector<Matx<float, 12, 1>> parallel_lines);
-Mat sub_water_area(Mat I,Mat &line1,Mat &line2);
+Mat image_rotate_parrallel_line(Mat I, Matx<float, 12, 1> parallel_line,Mat &image_rotate, Mat &r,vector<int> &area);
+Mat sub_water_area(Mat I);
 vector<Matx<float, 6, 1>> select_h_lines(Mat I, vector<Matx<float, 6, 1>> lines1, vector<Matx<float, 6, 1>> lines2);
 Mat get_e_boundary(Mat I, vector<Matx<float, 6, 1>> lines);
 vector<float> rotated2unrotated_point(Point2f point, Mat r);

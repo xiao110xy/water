@@ -282,7 +282,7 @@ vector<Matx<float, 12, 1>> get_parallel_lines(Mat image, vector<Matx<float, 6, 1
 		while (1) {
 			vector<Matx<float, 6, 1>> temp_line{temp_lines[0]};
 			temp_lines.erase(temp_lines.begin());
-			temp_line = merge_line(temp_line[0], temp_lines, data, 2.5, 20, 40);
+			temp_line = merge_line(temp_line[0], temp_lines, data, 2.5, 10, 40);
 			temp_lines = temp_line;
 			temp_lines.insert(temp_lines.end(), data.begin(), data.end());
 			if (temp_line.size() == 0)
@@ -845,7 +845,7 @@ vector<water_result> segement_area(Mat I, vector<vector<Mat>> &model)
 		r2 = r2 <= image_rotate.rows ? r2 : image_rotate.rows;
 		Mat data = image_rotate(Range(r1, r2), Range(c1, c2));
 		// 精细化小区域
-		Mat location = sub_water_area(data, line1, line2);
+		Mat location = sub_water_area(data);
 		if (location.total() == 0)
 			continue;
 		// 计算e点确切位置
@@ -937,6 +937,126 @@ vector<water_result> segement_area(Mat I, vector<vector<Mat>> &model)
 	return result;
 }
 
+vector<water_result> segement_roi_area(Mat I, vector<vector<Mat>>& model, vector<vector<int>> roi)
+{
+	Mat test_im;
+	vector<water_result> result;
+	for (int i = 0; i < roi.size(); ++i) {
+		vector<int> temp_roi = roi[i];
+		Mat image = I(Range(temp_roi[1], temp_roi[1] + temp_roi[3]), Range(temp_roi[0], temp_roi[0] + temp_roi[2])).clone();
+		vector<Matx<float, 6, 1>> lines1, lines2;
+		get_line(image, lines1, lines2);
+		auto parallel_lines = get_parallel_lines(image, lines1, lines2);
+		// 延伸平行线中的端点，直到图像边界
+		test_im = draw_line(image, parallel_lines);
+		parallel_lines = extend_line(image, parallel_lines);
+		// 去除重叠区域
+		parallel_lines = subtract_iou(image, parallel_lines);
+		test_im = draw_line(image, parallel_lines);
+		if ((lines1.size() == 0) || (lines2.size() == 0) || (parallel_lines.size() == 0))
+			continue;
+		// 根据平行线段进行图像旋转
+		Mat image_rotate, r;
+		vector<int> area;
+		Mat data = image_rotate_parrallel_line(image, parallel_lines[0], image_rotate, r,area);
+		// 精细化小区域
+		Mat location = sub_water_area(data);
+		if (location.total() == 0)
+			continue;
+		// 计算e点确切位置
+		vector<vector<float>> points = compute_e_point(data, location);
+		data = data(Range(0, data.rows), Range(location.at<int>(0, 0), location.at<int>(0, 1) + 1));
+		test_im = draw_point(data, points);
+		if (points.size() == 0)
+			continue;
+		// 数字识别
+		vector<vector<float>> number = number_area_recognition(data, points, model);
+		if (number.size() != 0) {
+			vector<float> temp;
+			for (int i = 0; i < number.size(); ++i)
+				if ((number[i])[0] > 9.5&&i != 0)
+					temp.push_back((number[i])[0]);
+			int n = temp.size();
+			(number[0])[0] += n * 10;
+			for (int i = 0; i < number.size(); ++i) {
+				(number[i])[0] = (float)((number[0])[0] - i * 0.5);
+			}
+		}
+		// 得出水线
+		Mat mask;
+		float water_line = get_water_line_meanshift(data, points, mask);
+		// 得到数值
+		vector<float> temp_water;
+		vector<float> temp_p;
+		float p = 0, water_number = 0;
+		for (int i = 1; i < points.size(); ++i) {
+			if ((*(points.begin() + i - 1))[1] > water_line)
+				break;
+			float x1, x2, y1, y2;
+			x1 = (*(points.begin() + i - 1))[1]; x2 = (*(points.begin() + i))[1];
+			y1 = (*(number.begin() + i - 1))[0]; y2 = (*(number.begin() + i))[0];
+			float temp = 0;
+			temp = 1 / (water_line - x1);
+			temp_p.push_back(temp);
+			p += temp;
+			temp = y1 + (y2 - y1) / (x2 - x1)*(water_line - x1);
+			temp_water.push_back(temp);
+			water_number += temp / (water_line - x1);
+		}
+		water_number = water_number / p;
+		// 
+		water_result water_area;
+		float x, y;
+		int r1=area[0], r2 = area[1], c1 = area[2], c2 = area[3];
+		temp_water.clear();
+		x = c1 + location.at<int>(0, 0); y = r1;
+		temp_p = rotated2unrotated_point(Point2f(x, y), r);
+		temp_p[0] += temp_roi[0];temp_p[1] += temp_roi[1];
+		temp_water.insert(temp_water.end(), temp_p.begin(), temp_p.end());
+		x = c1 + location.at<int>(0, 0); y = r2;
+		temp_p = rotated2unrotated_point(Point2f(x, y), r);
+		temp_p[0] += temp_roi[0]; temp_p[1] += temp_roi[1];
+		temp_water.insert(temp_water.end(), temp_p.begin(), temp_p.end());
+		x = c1 + location.at<int>(0, 1); y = r1;
+		temp_p = rotated2unrotated_point(Point2f(x, y), r);
+		temp_p[0] += temp_roi[0]; temp_p[1] += temp_roi[1];
+		temp_water.insert(temp_water.end(), temp_p.begin(), temp_p.end());
+		x = c1 + location.at<int>(0, 1); y = r2;
+		temp_p = rotated2unrotated_point(Point2f(x, y), r);
+		temp_p[0] += temp_roi[0]; temp_p[1] += temp_roi[1];
+		temp_water.insert(temp_water.end(), temp_p.begin(), temp_p.end());
+		water_area.parrallel_lines = temp_water;
+		// 水面线
+		temp_water.clear();
+		x = c1 + location.at<int>(0, 0) + 0.5; y = water_line + r1;
+		temp_p = rotated2unrotated_point(Point2f(x, y), r);
+		temp_p[0] += temp_roi[0]; temp_p[1] += temp_roi[1];
+		temp_water.insert(temp_water.end(), temp_p.begin(), temp_p.end());
+		x = c1 + location.at<int>(0, 0) + data.cols - 0.5; y = water_line + r1;
+		temp_p = rotated2unrotated_point(Point2f(x, y), r);
+		temp_p[0] += temp_roi[0]; temp_p[1] += temp_roi[1];
+		temp_water.insert(temp_water.end(), temp_p.begin(), temp_p.end());
+		water_area.water_lines = temp_water;
+		//
+		water_area.data = data.clone();
+		water_area.number = number;
+		for (int i = 0; i < points.size(); ++i) {
+			vector<float> temp = rotated2unrotated_point(Point2f(c1 + location.at<int>(0, 0) + (points[i])[0], (points[i])[1] + r1), r);
+			temp[0] += temp_roi[0];
+			temp[1] += temp_roi[1];
+			temp.push_back((points[i])[2]);
+			temp.push_back((points[i])[3]);
+			water_area.points.push_back(temp);
+		}
+		// 由于roi 加上偏置
+
+		water_area.water_number = water_number;
+		water_area.water_line = (int)water_line;
+		result.push_back(water_area);
+	}
+	return result;
+}
+
 vector<Matx<float, 12, 1>> extend_line(Mat I, vector<Matx<float, 12, 1>> parallel_lines)
 {
 	for (auto &i : parallel_lines) {
@@ -1017,7 +1137,60 @@ vector<Matx<float, 12, 1>> subtract_iou(Mat I, vector<Matx<float, 12, 1>> parall
 	return result;
 }
 
-Mat sub_water_area(Mat I, Mat &line1, Mat &line2)
+Mat image_rotate_parrallel_line(Mat I, Matx<float, 12, 1> parallel_line, Mat &image_rotate, Mat &r, vector<int> &area)
+{
+	Mat line1(2, 4, CV_32F), line2(2, 4, CV_32F);
+	Mat temp(2, 4, CV_32F);
+	temp.setTo(0);
+	temp.at<float>(0, 0) = parallel_line.val[0]; temp.at<float>(1, 0) = parallel_line.val[1];
+	temp.at<float>(0, 1) = parallel_line.val[2]; temp.at<float>(1, 1) = parallel_line.val[3];
+	line1 = temp.clone();
+	temp.setTo(0);
+	temp.at<float>(0, 0) = parallel_line.val[6]; temp.at<float>(1, 0) = parallel_line.val[7];
+	temp.at<float>(0, 1) = parallel_line.val[8]; temp.at<float>(1, 1) = parallel_line.val[9];
+	line2 = temp.clone();
+	// 旋转原始影像
+	float angle = (parallel_line.val[4] + parallel_line.val[10]) / 2;
+	Point2d center(I.cols / 2.0, I.rows / 2.0);
+	r = getRotationMatrix2D(center, 90 - angle, 1.0);
+	Rect bbox = RotatedRect(center, I.size(), 90 - angle).boundingRect();
+	r.at<double>(0, 2) += bbox.width / 2.0 - center.x;
+	r.at<double>(1, 2) += bbox.height / 2.0 - center.y;
+	cv::warpAffine(I, image_rotate, r, bbox.size());
+	// 截取大区域
+	r.convertTo(r, CV_32F);
+	for (int j = 0; j < 2; ++j) {
+		Mat temp;
+		line1.col(j).copyTo(temp);
+		temp = r.colRange(0, 2) * temp + r.colRange(2, 3);
+		temp.copyTo(line1.col(j + 2));
+		line2.col(j).copyTo(temp);
+		temp = r.colRange(0, 2) * temp + r.colRange(2, 3);
+		temp.copyTo(line2.col(j + 2));
+	}
+	int r1, r2, c1, c2;
+	double temp1, temp2;
+	line1.colRange(2, 4).copyTo(temp.colRange(0, 2));
+	line2.colRange(2, 4).copyTo(temp.colRange(2, 4));
+	cv::minMaxIdx(temp.row(0), &temp1, &temp2);
+	c1 = (int)round(temp1) >= 0 ? (int)round(temp1) : 0;
+	c2 = (int)round(temp2) <= image_rotate.cols ? (int)round(temp2) : image_rotate.cols;
+	temp1 = (double)temp.at<float>(1, 0);
+	temp2 = (double)temp.at<float>(1, 2);
+	r1 = temp1 >= temp2 ? (int)ceil(temp1) : (int)ceil(temp2);
+	temp1 = (double)temp.at<float>(1, 1);
+	temp2 = (double)temp.at<float>(1, 3);
+	r2 = temp1 <= temp2 ? (int)floor(temp1) : (int)floor(temp2);
+	r2 = r2 <= image_rotate.rows ? r2 : image_rotate.rows;
+	vector<int> temp_area(4, 0);
+	temp_area[0] = r1;temp_area[1] = r2;
+	temp_area[2] = c1;temp_area[3] = c2;
+	area = temp_area;
+	Mat data = image_rotate(Range(r1, r2), Range(c1, c2));
+	return data;
+}
+
+Mat sub_water_area(Mat I)
 {
 	Mat test_im;
 	// 检测直线
