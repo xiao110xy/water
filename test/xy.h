@@ -3,7 +3,6 @@
 
 Mat Edge_Detect(Mat im,int aperture_size);
 
-
 Mat draw_part_E(Mat im, vector<vector<vector<Point3f>>> data);
 
 vector<vector<vector<Point3f>>> get_pointline(Mat dx, Mat dy, vector<Point3f> points, bool flag, Mat flag_name);
