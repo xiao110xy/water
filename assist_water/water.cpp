@@ -81,18 +81,24 @@ bool input_assist(string file_name, vector<assist_information> & assist_files, v
 		vector<double> roi;
 		getline(assist_file_name, temp_name);
 		for (int i = 0; i < temp_name.size(); ++i) {
-			int temp_value = 0;
-			int j = 0;
-			for (j = i; j < temp_name.size(); ++j) {
-				if (temp_name[j] >= 48 && temp_name[j] <= 57) {
-					temp_value = temp_value * 10 + temp_name[j] - 48;
+			if (temp_name[i] >= 48 && temp_name[i] <= 57) {
+				double temp_value = 0;
+				int j = i;
+				int n = -1;
+				for (; j < temp_name.size(); ++j) {
+					if (temp_name[j]==44||temp_name[j] == 59) {
+						temp_value = n == -1 ? temp_value : temp_value / pow(10, j - n - 1);
+						roi.push_back(temp_value);
+						break;
+					}
+					if (temp_name[j] >=48 && temp_name[j] <= 57) {
+						temp_value = temp_value * 10 + temp_name[j] - 48;
+					}
+					if (temp_name[j] == 46)
+						n = j;
 				}
-				else {
-					break;
-				}
+				i = j;
 			}
-			i = j;
-			roi.push_back((double)temp_value);
 		}
 		if (roi.size() != 4)
 			break;
@@ -103,18 +109,24 @@ bool input_assist(string file_name, vector<assist_information> & assist_files, v
 			getline(assist_file_name, temp_name);
 			vector<double> temp;
 			for (int i = 0; i < temp_name.size(); ++i) {
-				int temp_value = 0;
-				int j = 0;
-				for (j = i; j < temp_name.size(); ++j) {
-					if (temp_name[j] >= 48 && temp_name[j] <= 57) {
-						temp_value = temp_value * 10 + temp_name[j] - 48;
+				if (temp_name[i] >= 48 && temp_name[i] <= 57) {
+					double temp_value = 0;
+					int j = i;
+					int n = -1;
+					for (; j < temp_name.size(); ++j) {
+						if (temp_name[j] == 44 || temp_name[j] == 59) {
+							temp_value = n == -1 ? temp_value : temp_value / pow(10, j - n - 1);
+							temp.push_back(temp_value);
+							break;
+						}
+						if (temp_name[j] >= 48 && temp_name[j] <= 57) {
+							temp_value = temp_value * 10 + temp_name[j] - 48;
+						}
+						if (temp_name[j] == 46)
+							n = j;
 					}
-					else {
-						break;
-					}
+					i = j;
 				}
-				i = j;
-				temp.push_back((double)temp_value);
 			}
 			temp_point.push_back(temp);
 		}
@@ -249,16 +261,20 @@ double compute_rms(Mat base_point, Mat wrap_point, Mat r)
 void get_water_line(assist_information & assist_file)
 {
 	Mat im = assist_file.wrap_image.clone();
-	float water_line ;
-	double sigmarS = 10, sigmarR = 15;
+	float water_line = 9999;
+	double sigmarS = 30, sigmarR = 40;
 	int label;
-	int y1 = floor(Edge_Detect(assist_file.wrap_image,3));
+	int y1 = floor(Edge_Detect(assist_file.wrap_image,3))+5;
 	Mat mask, label_mask;
 	while (1) {
 		// 处理分割
 		MeanShiftSegmentor s;
 		s.m_SigmaS = sigmarS;
 		s.m_SigmaR = sigmarR;
+		if (sigmarR <20) {
+			water_line = assist_file.base_image.rows - 1;
+			break;
+		}
 		s.SetImage(im);
 		s.Run();
 		s.ShowResult();
@@ -266,7 +282,6 @@ void get_water_line(assist_information & assist_file)
 		mask = s.m_Result.clone();
 		// 超出部分，插值为0
 		// 将超出部分的label设置为-1;
-		mask.rowRange(Range(0, y1)).setTo(-1);
 		for (int i = 0; i < mask.rows; ++i) {
 			int n = 0;
 			for (int j = 0; j < mask.cols; ++j) {
@@ -276,68 +291,72 @@ void get_water_line(assist_information & assist_file)
 				}
 			}
 		}
-		bool flag = get_label_mask(mask,label, label_mask, assist_file);
+		bool flag = get_label_mask(mask,label, label_mask, assist_file,y1);
 		if (flag) {
+			Mat element1 = getStructuringElement(MORPH_RECT, Size(3, 5));
+			Mat element2 = getStructuringElement(MORPH_RECT, Size(5, 3));
+			Mat temp = mask.clone();
+			temp.convertTo(temp, CV_8U);
+			erode(temp, temp, element1);
+			erode(temp, temp, element2);
+			dilate(temp, temp, element2);
+			dilate(temp, temp, element1);
 			vector<float> y_num;
-			for (int i = 0; i < mask.cols; ++i) {
-				for (int j = 0; j < mask.rows; ++j)
-					if (mask.at<int>(j, i) == label) {
+			for (int i = 0; i < temp.cols; ++i) {
+				for (int j = 0; j < temp.rows; ++j)
+					if (temp.at<uchar>(j, i) == label) {
 						y_num.push_back((float)j);
 						break;
 					}
 			}
-			//// 线中间部分最小值
-			//int index1 = (int)y_num.size() / 3, index2 = 2 * (int)y_num.size() / 3;
-			//for (int i = index1; i < index2; ++i)
-			//	if (water_line < y_num[i])
-			//		water_line = y_num[i];
-			// 平均值
-			float y1_1 = 9999,y2_1 = 9999,y3_1=9999;
-			float y1_2 = -9999,y2_2=- 9999, y3_2 = -9999;
+			// 线中间部分最小值
 			int index1 = (int)y_num.size() / 4, index2 = 3 * (int)y_num.size() / 4;
-			for (int i = 0; i < index1; ++i) {
-				y1_1 = y1_1 < y_num[i] ? y1_1 : y_num[i];
-				y1_2 = y1_2 > y_num[i] ? y1_2 : y_num[i];
-			}
-			for (int i = index1; i < index2; ++i) {
-				y2_1 = y2_1 < y_num[i] ? y2_1 : y_num[i];
-				y2_2 = y2_2 > y_num[i] ? y2_2 : y_num[i];
-			}
-			for (int i = index2; i < y_num.size(); ++i) {
-				y3_1 = y3_1 < y_num[i] ? y3_1 : y_num[i];
-				y3_2 = y3_2 > y_num[i] ? y3_2 : y_num[i];
-			}
-			water_line = round((y1_1 + y1_2 + y2_1 + y2_2 + y3_1 + y3_2) / 6);
+			for (int i = index1; i <index2; ++i)
+				if (water_line > y_num[i])
+					water_line = y_num[i];
+			//// 平均值
+			//float y1_1 = 9999,y2_1 = 9999,y3_1=9999;
+			//float y1_2 = -9999,y2_2=- 9999, y3_2 = -9999;
+			//int index1 = (int)y_num.size() / 4, index2 = 3 * (int)y_num.size() / 4;
+			//for (int i = 0; i < index1; ++i) {
+			//	y1_1 = y1_1 < y_num[i] ? y1_1 : y_num[i];
+			//	y1_2 = y1_2 > y_num[i] ? y1_2 : y_num[i];
+			//}
+			//for (int i = index1; i < index2; ++i) {
+			//	y2_1 = y2_1 < y_num[i] ? y2_1 : y_num[i];
+			//	y2_2 = y2_2 > y_num[i] ? y2_2 : y_num[i];
+			//}
+			//for (int i = index2; i < y_num.size(); ++i) {
+			//	y3_1 = y3_1 < y_num[i] ? y3_1 : y_num[i];
+			//	y3_2 = y3_2 > y_num[i] ? y3_2 : y_num[i];
+			//}
+			//water_line = round((y1_1 + y1_2 + y2_1 + y2_2 + y3_1 + y3_2) / 6);
 			water_line = round(water_line) < assist_file.base_image.rows - 1 ? round(water_line) : assist_file.base_image.rows - 1;
 			break;
 		}
 		else {
-			sigmarS = sigmarS + 1;
-			sigmarR = sigmarR + 2;
-		}
-		if (sigmarR > 30) {
-			water_line = assist_file.base_image.rows - 1;
-			break;
+			sigmarS = sigmarS - 1;
+			sigmarR = sigmarR - 2;
 		}
 	}
 	// water_line
 	Mat water_line_point = Mat::zeros(Size(2, 2), CV_64F);
 	water_line_point.at<double>(0, 0) = 0;
-	int y2 = water_line;
-	for (int i = y2;i>=0;--i)
+	int y2_1 = water_line;
+	for (int i = y2_1;i>=0;--i)
 		if (mask.at<int>(i,0) >= 0) {
-			y2 = i;
+			y2_1 = i;
 			break;
 		}
-	water_line_point.at<double>(0, 1) = y2;
+	water_line_point.at<double>(0, 1) = y2_1;
 	water_line_point.at<double>(1, 0) = assist_file.base_image.cols-1;
-	y2 = water_line;
-	for (int i = y2; i >= 0; --i)
+	int y2_2 = water_line;
+	for (int i = y2_2; i >= 0; --i)
 		if (mask.at<int>(i,assist_file.base_image.cols - 1) >= 0) {
-			y2 = i;
+			y2_2 = i;
 			break;
 		}
-	water_line_point.at<double>(1, 1) = y2;
+	water_line_point.at<double>(1, 1) = y2_2;
 	water_line_point = compute_point(water_line_point, assist_file.r);
 	assist_file.water_lines.clear();
 	assist_file.water_lines.push_back(water_line_point.at<double>(0, 0));
@@ -345,9 +364,10 @@ void get_water_line(assist_information & assist_file)
 	assist_file.water_lines.push_back(water_line_point.at<double>(1, 0));
 	assist_file.water_lines.push_back(water_line_point.at<double>(1, 1));
 	// water number
+	water_line = y2_1 < y2_2 ? y2_1 : y2_2;
 	assist_file.water_number = (1-(water_line + 1) / (double)assist_file.base_image.rows)*assist_file.length;
 }
-bool get_label_mask(Mat mask,int & label, Mat &label_mask, assist_information assist_file)
+bool get_label_mask(Mat mask,int & label, Mat &label_mask, assist_information assist_file,int y_t)
 {
 	Mat data = mask.clone();
 	// 得到共有多少个label，label 为n+1
@@ -368,13 +388,25 @@ bool get_label_mask(Mat mask,int & label, Mat &label_mask, assist_information as
 		if (j == mask.cols)
 			temp_label[mask.at<int>(i, 0)].push_back(i);
 	}
+	// 排除
+	for (int i = 0; i < y_t; ++i) {
+		for (int j = 0; j < mask.cols; ++j) {
+			if (mask.at<int>(i, j)>=0)
+				temp_label[mask.at<int>(i, j)].clear();
+		}
+	}
 	// 寻找到一个合适的类别
 	float label_t = (2.5 / assist_file.length)*mask.rows;
 	label = -1;
-	for (int i = 0; i < n; ++i) {
-		if (temp_label[i].size() > label_t) {
+	for (int i =0; i <=n; ++i) {
+		if (temp_label[i].size() < label_t)
+			continue;
+		if (label < 0)
 			label = i;
-			break;
+		else {
+			if (temp_label[i].size() > temp_label[label].size()) {
+				label = i;
+			}
 		}
 	}
 	if (label<0)
@@ -593,7 +625,7 @@ double Edge_Detect(Mat im, int aperture_size)
 	Mat flag_image = Mat::zeros(data.size(), CV_8UC1);
 	vector<vector<vector<Point3f>>> E_area1 = get_pointline(dx, dy, points1, true, flag_image);
 	vector<vector<vector<Point3f>>> E_area2 = get_pointline(dx, dy, points2, false, flag_image);
-	vector<vector<vector<Point3f>>> rest_point_line = select_point_line(E_area1, E_area2);
+	//vector<vector<vector<Point3f>>> rest_point_line = select_point_line(E_area1, E_area2);
 	Mat temp[3];
 	temp[0] = data.clone(); temp[1] = data.clone(); temp[2] = data.clone();
 	merge(temp, 3, test_im);
@@ -620,17 +652,17 @@ double Edge_Detect(Mat im, int aperture_size)
 				test_im.at<Vec3b>(k.y, k.x).val[2] = rgb[j].val[2];
 			}
 	}
-	rgb[0] = Scalar(0, 255, 0);
-	rgb[1] = Scalar(0, 255, 255);
-	rgb[2] = Scalar(255, 255, 0);
-	for (auto i : rest_point_line) {
-		for (int j = 0; j<3; ++j)
-			for (auto k : i[j]) {
-				test_im.at<Vec3b>(k.y, k.x).val[0] = rgb[j].val[0];
-				test_im.at<Vec3b>(k.y, k.x).val[1] = rgb[j].val[1];
-				test_im.at<Vec3b>(k.y, k.x).val[2] = rgb[j].val[2];
-			}
-	}
+	//rgb[0] = Scalar(0, 255, 0);
+	//rgb[1] = Scalar(0, 255, 255);
+	//rgb[2] = Scalar(255, 255, 0);
+	//for (auto i : rest_point_line) {
+	//	for (int j = 0; j<3; ++j)
+	//		for (auto k : i[j]) {
+	//			test_im.at<Vec3b>(k.y, k.x).val[0] = rgb[j].val[0];
+	//			test_im.at<Vec3b>(k.y, k.x).val[1] = rgb[j].val[1];
+	//			test_im.at<Vec3b>(k.y, k.x).val[2] = rgb[j].val[2];
+	//		}
+	//}
 	// 去除非中心区域
 	double result = 0.0;
 	vector<vector<vector<Point3f>>> E_area;
@@ -638,17 +670,10 @@ double Edge_Detect(Mat im, int aperture_size)
 	E_area.insert(E_area.end(), E_area2.begin(), E_area2.end());
 	stable_sort(E_area.begin(), E_area.end(),
 		[](vector<vector<Point3f>> a, vector<vector<Point3f>> b) {return (a[0])[0].y < (b[0])[0].y; });
-	if (E_area.size() < 3)
+	if (E_area.size() ==0)
 		return 0;
-	for (int i = 0; i < E_area.size() - 1; ++i) {
-		vector<Point3f> temp1 = (E_area[i])[0];
-		vector<Point3f> temp2 = (E_area[i+1])[0];
-		double y1 = (*(temp1.end() - 1)).y;
-		double y2 = temp2[0].y;
-		if (y2 - y1 < 1.5*(temp1.size() + temp2.size()))
-			result = floor(y2);
-	}
-	return result;
+	else
+		return (*((E_area[E_area.size() - 1])[0].end() - 1)).y;
 }
 
 Mat draw_part_E(Mat im, vector<vector<vector<Point3f>>> data)
@@ -779,9 +804,9 @@ vector<vector<vector<Point3f>>> get_pointline(Mat dx, Mat dy, vector<Point3f> po
 		if (abs((temp[0])[0].x - (temp2[0])[0].x) > (flag_image.cols / 12 < 3 ? flag_image.cols / 12 : 3))
 			continue;
 		// y 差值不大
-		if ((temp[0])[0].y - (temp1[0])[temp1[0].size() - 1].y > 1.5*temp[0].size())
+		if ((temp[0])[0].y - (temp1[0])[temp1[0].size() - 1].y > 2.5*temp[0].size())
 			continue;
-		if ((temp2[0])[0].y - (temp[0])[temp[0].size() - 1].y > 1.5*temp[0].size())
+		if ((temp2[0])[0].y - (temp[0])[temp[0].size() - 1].y > 2.5*temp[0].size())
 			continue;
 		temp_result.push_back(temp);
 		x_points.push_back(Point2f((temp[0])[0].x, (temp[0])[0].y));

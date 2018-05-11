@@ -41,7 +41,7 @@ Mat compute_point(Mat point, Mat r);
 double compute_rms(Mat base_point, Mat wrap_point, Mat r);
 // 水位线识别
 void get_water_line(assist_information &assist_file);
-bool get_label_mask(Mat mask,int &label, Mat &label_mask, assist_information assist_file);
+bool get_label_mask(Mat mask,int &label, Mat &label_mask, assist_information assist_file,int y_t);
 // 结果保存
 void save_file(Mat im, vector<assist_information> assist_files,string image_result, string para_result);
 // 功能函数
