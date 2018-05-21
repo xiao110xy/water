@@ -73,7 +73,7 @@ bool input_assist(string file_name, vector<assist_information> & assist_files, v
 			i = j;
 			temp.push_back(temp_value);
 		}
-		if (temp.size() == 0|| assist_files.size() != temp[0])
+		if (temp.size() == 0|| assist_files.size() != temp[0]-1)
 			break;
 		temp_assist_file.base_image = template_image[temp[1] - 1];
 		temp_assist_file.length = temp[2];
@@ -262,9 +262,9 @@ void get_water_line(assist_information & assist_file)
 {
 	Mat im = assist_file.wrap_image.clone();
 	float water_line = 9999;
-	double sigmarS = 30, sigmarR = 40;
+	int sigmarS = 30, sigmarR = 40;
 	int label;
-	int y1 = floor(Edge_Detect(assist_file.wrap_image,3))+5;
+	int y1 = (int)floor(Edge_Detect(assist_file.wrap_image,3))+5;
 	Mat mask, label_mask;
 	while (1) {
 		// 处理分割
@@ -673,7 +673,7 @@ double Edge_Detect(Mat im, int aperture_size)
 	if (E_area.size() ==0)
 		return 0;
 	else
-		return (*((E_area[E_area.size() - 1])[0].end() - 1)).y;
+		return (*((E_area[E_area.size()-1])[0].end() - 1)).y;
 }
 
 Mat draw_part_E(Mat im, vector<vector<vector<Point3f>>> data)
@@ -784,7 +784,7 @@ vector<vector<vector<Point3f>>> get_pointline(Mat dx, Mat dy, vector<Point3f> po
 		}
 		if (num1 < num2)
 			continue;
-		fillPoly(flag_image, vector<vector<Point>>{draw_temp}, Scalar(result.size() + 1));
+		fillPoly(flag_image, vector<vector<Point>>{draw_temp}, Scalar((int)result.size() + 1));
 		result.push_back(temp_result);
 	}
 	// 去除掉一些非横线
