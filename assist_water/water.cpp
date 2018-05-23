@@ -142,12 +142,15 @@ bool input_assist(string file_name, vector<assist_information> & assist_files, v
 void compute_water_area(Mat im, vector<assist_information> &assist_files)
 {
 	for (auto &assist_file : assist_files) {
-		// 延伸
+		// 延伸一部分水尺区域
 		assist_file.add_row = 25;
 		Mat base_image = assist_file.base_image;
 		Mat add_image = Mat::zeros(Size(base_image.cols, assist_file.add_row), CV_64F);
 		vconcat(base_image, add_image, assist_file.wrap_image);
+		// 旋转校正
 		Mat image_rotate = correct_image(im, assist_file);
+		//imwrite("j.bmp", image_rotate);
+		// 获得水位线
 		get_water_line(assist_file);
 	}
 }
@@ -155,25 +158,70 @@ void compute_water_area(Mat im, vector<assist_information> &assist_files)
 Mat correct_image(Mat im, assist_information &assist_file)
 {
 	Mat result,map_x,map_y;
-	map_coord(assist_file, map_x, map_y);
+	map_coord(assist_file, map_x, map_y);// map_x,map_y float型数据
 	remap(im, result, map_x, map_y,CV_INTER_CUBIC);
 	assist_file.wrap_image = result;
 	// 将roi 即水尺区域的平行线保存
-	vector<double> parrallel_lines;
-	parrallel_lines.push_back((double)map_x.at<float>(0, 0));
-	parrallel_lines.push_back((double)map_y.at<float>(0, 0));
-	parrallel_lines.push_back((double)map_x.at<float>(map_x.rows - 1, 0));
-	parrallel_lines.push_back((double)map_y.at<float>(map_y.rows - 1, 0));
-	parrallel_lines.push_back((double)map_x.at<float>(0, map_x.cols - 1));
-	parrallel_lines.push_back((double)map_y.at<float>(0, map_y.cols - 1));
-	parrallel_lines.push_back((double)map_x.at<float>(map_x.rows - 1, map_x.cols - 1));
-	parrallel_lines.push_back((double)map_y.at<float>(map_x.rows - 1, map_y.cols - 1));
-	assist_file.parrallel_lines = parrallel_lines;
+	// 存在一些问题 需要使用拟合的方式进行一定的处理
+	Vec4f line_para;
+	vector<Point2d> points;
+	Point2d point1, point2;
+	// 左侧线段
+	Mat test_im = Mat::zeros(Size(2000, 2000), CV_8UC3);
+	for (int i = 0; i < assist_file.wrap_image.rows; ++i) {
+		points.push_back(Point2d(map_x.at<float>(i, 0), map_y.at<float>(i, 0)));
+		circle(test_im, points[i], 1, Scalar(255, 0, 0));
+		assist_file.parrallel_left.push_back(points[i]);
+	}
+	fitLine(points, line_para, CV_DIST_FAIR, 0, 1e-2, 1e-2);
+	point1.y = 9999; point2.y = -9999;
+	for (auto i : points) {
+		float d = (i.x - line_para[2])*line_para[0] + (i.y - line_para[3])*line_para[1];
+		float x = d * line_para[0] + line_para[2];
+		float y = d * line_para[1] + line_para[3];
+		if (point1.y > y) {
+			point1.x = x;
+			point1.y = y;
+		}
+		if (point2.y < y) {
+			point2.x = x;
+			point2.y = y;
+		}
+	}
+	line(test_im, point1, point2, Scalar(0, 255, 0));
+	assist_file.parrallel_lines.push_back(point1);
+	assist_file.parrallel_lines.push_back(point2);
+	// 右侧线段
+	points.clear();
+	for (int i = 0; i < assist_file.wrap_image.rows; ++i) {
+		points.push_back(Point2d(map_x.at<float>(i, assist_file.wrap_image.cols-1), map_y.at<float>(i, assist_file.wrap_image.cols - 1)));
+		circle(test_im, points[i], 1, Scalar(255, 0, 0));
+		assist_file.parrallel_right.push_back(points[i]);
+	}
+	fitLine(points, line_para, CV_DIST_FAIR, 0, 1e-2, 1e-2);
+	point1.y = 9999; point2.y = -9999;
+	for (auto i : points) {
+		float d = (i.x - line_para[2])*line_para[0] + (i.y - line_para[3])*line_para[1];
+		float x = d * line_para[0] + line_para[2];
+		float y = d * line_para[1] + line_para[3];
+		if (point1.y > y) {
+			point1.x = x;
+			point1.y = y;
+		}
+		if (point2.y < y) {
+			point2.x = x;
+			point2.y = y;
+		}
+	}
+	line(test_im, point1, point2, Scalar(0, 255, 0));
+	assist_file.parrallel_lines.push_back(point1);
+	assist_file.parrallel_lines.push_back(point2);
 	return result;
 }
 
 void map_coord(assist_information & assist_file, Mat &map_x, Mat &map_y)
 {
+	// 获取变换的矩阵
 	Mat r = GeoCorrect2Poly(assist_file, true);
 	Mat r_inv = GeoCorrect2Poly(assist_file, false);
 	Mat point = vector2Mat(assist_file.point);
@@ -465,9 +513,16 @@ void save_file(Mat im, vector<assist_information> assist_files, string image_res
 	for (int i = 0; i < assist_files.size(); ++i) {
 
 		assist_information temp = assist_files[i];
+		// 画出水尺两侧域
+		for (auto i : temp.parrallel_left) {
+			circle(result, i, 1, Scalar(0, 0, 255), 1);
+		}
+		for (auto i : temp.parrallel_right) {
+			circle(result, i, 1, Scalar(0, 0, 255), 1);
+		}
 		// 画出水尺区域线
-		line(result, Point2d(temp.parrallel_lines[0], temp.parrallel_lines[1]), Point2d(temp.parrallel_lines[2], temp.parrallel_lines[3]), Scalar(255, 0, 0), 2);
-		line(result, Point2d(temp.parrallel_lines[4], temp.parrallel_lines[5]), Point2d(temp.parrallel_lines[6], temp.parrallel_lines[7]), Scalar(255, 0, 0), 2);
+		line(result, temp.parrallel_lines[0], temp.parrallel_lines[1], Scalar(255, 0, 0), 2);
+		line(result, temp.parrallel_lines[2], temp.parrallel_lines[3], Scalar(255, 0, 0), 2);
 		// 画出水线
 		line(result, Point2d(temp.water_lines[0], temp.water_lines[1]), Point2d(temp.water_lines[2], temp.water_lines[3]), Scalar(0, 255, 0), 2);
 		// 画出数值

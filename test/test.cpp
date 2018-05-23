@@ -33,10 +33,10 @@ int main(int argc,void **agrv)
 	//}
 	imgSrc = imread("2.png", CV_LOAD_IMAGE_ANYDEPTH | CV_LOAD_IMAGE_ANYCOLOR);
 	cvtColor(imgSrc, imgGray, CV_RGB2GRAY);//彩色图像转换为灰度图
-	im = imgGray.clone();
-	Edge_Detect(imgSrc, 3);
-	g_nThresh_low = 0;//初始化低阈值值0
-	g_nThresh_high = 0;//初始化高阈值为0
+	//im = imgGray.clone();
+	//Edge_Detect(imgSrc, 3);
+	//g_nThresh_low = 0;//初始化低阈值值0
+	//g_nThresh_high = 0;//初始化高阈值为0
 
 	namedWindow("Edge Detection", CV_WINDOW_AUTOSIZE);//生成主窗口，用来容纳滚动条与图像
 	imshow("Edge Detection", imgGray);

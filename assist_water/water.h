@@ -23,7 +23,9 @@ struct assist_information {
 	double rms_1, rms_2;
 	// 分割水位线
 	Mat segment_result;
-	vector<double> parrallel_lines;
+	vector<Point2d> parrallel_lines;
+	vector<Point2d> parrallel_left;
+	vector<Point2d> parrallel_right;
 	vector<double> water_lines;
 	double water_number;
 };
