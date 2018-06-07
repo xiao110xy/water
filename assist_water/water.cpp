@@ -139,9 +139,10 @@ bool input_assist(string file_name, vector<assist_information> & assist_files, v
 		return true;
 }
 
-void compute_water_area(Mat im, vector<assist_information> &assist_files)
+void compute_water_area(Mat im, vector<assist_information> &assist_files, string base_name)
 {
-	for (auto &assist_file : assist_files) {
+	int n = 0;
+	for (auto &assist_file:assist_files) {
 		// 延伸一部分水尺区域
 		assist_file.add_row = 25;
 		Mat base_image = assist_file.base_image;
@@ -149,9 +150,20 @@ void compute_water_area(Mat im, vector<assist_information> &assist_files)
 		vconcat(base_image, add_image, assist_file.wrap_image);
 		// 旋转校正
 		Mat image_rotate = correct_image(im, assist_file);
-		//imwrite("j.bmp", image_rotate);
-		// 获得水位线
-		get_water_line(assist_file);
+		assist_file.base_image = image_rotate.rowRange(0, base_image.rows).clone();
+		// 获得水位线,两种方式选择
+		string ref_image_name = "ref_" + base_name +"_"+to_string(n+1) +".bmp";
+		fstream _file;
+		_file.open(ref_image_name, ios::in);
+		if (!_file) {
+			get_water_line(assist_file);// 不需要历史数据参考
+		}
+		else {
+			Mat ref_image = imread(ref_image_name);// 历史参考数据
+			get_water_line(assist_file, ref_image);
+		}
+		_file.close();
+		++n;
 	}
 }
 
@@ -505,14 +517,84 @@ bool get_label_mask(Mat mask,int & label, Mat &label_mask, assist_information as
 	return true;
 }
 
-void save_file(Mat im, vector<assist_information> assist_files, string image_result, string para_result)
+void get_water_line(assist_information & assist_file, Mat ref_image)
+{
+	Mat im = assist_file.base_image.clone();
+	int n = im.rows / assist_file.length;
+	vector<float> score1,score2,score3;
+	float max_score = 0.5;
+	int c1 = im.cols / 2,c2 = im.cols;
+	// 一个E
+	for (int i = 0; i < (int)assist_file.length/5; ++i) {
+		int r1 = i * 5*n;
+		int r2 = (i + 1)*5*n;
+		Mat temp1 = i % 2 ==0 ? im(Range(r1,r2 ), Range(0,c1)) : 
+			im(Range(r1, r2), Range(c1,c2));
+		Mat temp2 = i % 2 ==0 ? ref_image(Range(r1, r2), Range(0, c1)) :
+			ref_image(Range(r1, r2), Range(c1, c2));
+		Mat temp;
+		matchTemplate(temp1, temp2, temp, CV_TM_CCOEFF_NORMED);
+		max_score = max_score > temp.at<float>(0, 0)?max_score:temp.at<float>(0, 0);
+		if (temp.at<float>(0, 0) < 0.5*max_score) {
+			// E的小部分
+			for (int j = 0; j < 5; ++j) {
+				Mat temp_temp1 = temp1.rowRange(j*n,(j+1)*n);
+				Mat temp_temp2 = temp2.rowRange(j*n, (j + 1)*n);
+				Mat temp;
+				matchTemplate(temp_temp1, temp_temp2, temp, CV_TM_CCOEFF_NORMED);
+				if (temp.at<float>(0, 0) < 0.3*max_score) {
+					for (int k = 0; k < n; ++k) {
+						Mat temp_temp_temp1 = temp_temp1.row(k);
+						Mat temp_temp_temp2 = temp_temp2.row(k);
+						Mat temp;
+						matchTemplate(temp_temp_temp1, temp_temp_temp2, temp, CV_TM_CCOEFF_NORMED);
+						if (temp.at<float>(0, 0) < 0.2*max_score)
+							break;
+						else
+							score3.push_back(temp.at<float>(0, 0));
+					}
+					break;
+				}
+				else
+					score2.push_back(temp.at<float>(0, 0));
+			}
+			break;
+		}
+		else
+			score1.push_back(temp.at<float>(0, 0));
+	}
+	// water number
+	assist_file.water_number = assist_file.length-5*score1.size()-score2.size()-score3.size()/10.0;
+	//	water_line 
+	double water_line = (1-assist_file.water_number/assist_file.length)*assist_file.base_image.rows-1;
+	Mat water_line_point = Mat::zeros(Size(2, 2), CV_64F);
+	water_line_point.at<double>(0, 0) = 0;
+	water_line_point.at<double>(0, 1) = water_line;
+	water_line_point.at<double>(1, 0) = c2 - 1;
+	water_line_point.at<double>(1, 1) = water_line;
+	water_line_point = compute_point(water_line_point, assist_file.r);
+	assist_file.water_lines.clear();
+	assist_file.water_lines.push_back(water_line_point.at<double>(0, 0));
+	assist_file.water_lines.push_back(water_line_point.at<double>(0, 1));
+	assist_file.water_lines.push_back(water_line_point.at<double>(1, 0));
+	assist_file.water_lines.push_back(water_line_point.at<double>(1, 1));
+
+}
+
+void save_file(Mat im, vector<assist_information> assist_files, string base_name, string image_result, string para_result)
 {
 	//结果保存
 	Mat result = im.clone();
 	vector<vector<float>> temp_water_number;
 	for (int i = 0; i < assist_files.size(); ++i) {
-
 		assist_information temp = assist_files[i];
+		// 子部分
+		fstream _file;
+		_file.open("sub_"+base_name+"_"+ to_string(i+1)+".bmp", ios::in);
+		if (!_file) {
+			imwrite("sub_" + base_name + "_" + to_string(i + 1) + ".bmp", temp.base_image);
+		}
+		_file.close();
 		// 画出水尺两侧域
 		for (auto i : temp.parrallel_left) {
 			circle(result, i, 1, Scalar(0, 0, 255), 1);
@@ -547,6 +629,12 @@ void save_file(Mat im, vector<assist_information> assist_files, string image_res
 	}
 	// 读写图像
 	imwrite(image_result, result);
+	//fstream _file;
+	//_file.open(image_result, ios::in);
+	//if (!_file) {
+	//	imwrite(image_result, result);
+	//}
+	//_file.close();
 	// 读写文件
 	stable_sort(assist_files.begin(), assist_files.end(),
 		[](assist_information a, assist_information b) {return a.water_lines[0] < b.water_lines[0]; });
@@ -559,8 +647,10 @@ void save_file(Mat im, vector<assist_information> assist_files, string image_res
 		file << fixed << setprecision(1) << round(temp.water_number * 10) / 10 << ";" << endl;
 		file << "GuageArea=";
 		for (int j = 0; j < temp.parrallel_lines.size(); ++j) {
-			file << fixed << setprecision(2) << temp.parrallel_lines[j];
-			if ((j % 4) == 3)
+			file << fixed << setprecision(2) << temp.parrallel_lines[j].x;
+			file << ",";
+			file << fixed << setprecision(2) << temp.parrallel_lines[j].y;			
+			if ((j % 2) == 1)
 				file << ";";
 			else
 				file << ",";

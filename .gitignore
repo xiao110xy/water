@@ -11,7 +11,8 @@ water_line/x64
 #
 enc_temp_folder
 #
+*.bmp
 *.png
 *.jpg
 *.txt
-*.txt
+*.pts
