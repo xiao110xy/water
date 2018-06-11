@@ -76,6 +76,8 @@ FORMS += ui/mainwindow.ui \
 RESOURCES += share/icons/icons.qrc \
     share/images/images.qrc
 
+TRANSLATIONS = piv_zh.ts
+
    
 
 

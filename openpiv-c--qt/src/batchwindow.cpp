@@ -1,4 +1,4 @@
-/*
+﻿/*
 ====================================================================================
 
 File: batchwindow.cpp
@@ -69,6 +69,7 @@ void BatchWindow::setSettings(Settings *settingsPass)
 
 void BatchWindow::startClicked()
 {
+	progress = 0;
     emit(startProcess());
 }
 
@@ -139,5 +140,6 @@ void BatchWindow::refreshEnabled()
 void BatchWindow::refresh()
 {
     // Refreshing the UI
+	
     refreshEnabled();
 }

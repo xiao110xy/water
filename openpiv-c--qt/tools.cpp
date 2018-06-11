@@ -12,7 +12,7 @@ tools::~tools()
 }
 
 int tools::extract_video(string file_all_name, string file_path, string base_name)
-{
+{	
 	//打开视频文件：其实就是建立一个VideoCapture结构  
 	VideoCapture capture;
 	//检测是否正常打开:成功打开时，isOpened返回ture  

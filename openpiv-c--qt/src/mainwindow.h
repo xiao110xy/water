@@ -32,6 +32,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <iostream>
 #include <fstream>
 using namespace std;
+#include "opencv2/highgui/highgui.hpp"
+#include "opencv2/imgproc/imgproc.hpp"  
+#include "opencv2/core/core.hpp"
+#include "opencv2/features2d/features2d.hpp"  
+using namespace cv;
 //
 
 #ifndef MAINWINDOW_H

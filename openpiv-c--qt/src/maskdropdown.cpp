@@ -35,13 +35,13 @@ MaskDropDown::MaskDropDown(QWidget *parent) : QMenu(parent)
     QAction *tempAction;
 
     //Adding actions to the drop down menu
-    tempAction = new QAction("Import mask...", this);
+    tempAction = new QAction(tr("Import mask..."), this);
     tempAction->setCheckable(false);
     actionList.append(tempAction);
-    tempAction = new QAction("Show grid", this);
+    tempAction = new QAction(tr("Show grid"), this);
     tempAction->setChecked(false);
     actionList.append(tempAction);
-    tempAction = new QAction("Clear mask", this);
+    tempAction = new QAction(tr("Clear mask"), this);
     actionList.append(tempAction);
     this->addActions(actionList);
 
