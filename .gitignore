@@ -16,3 +16,10 @@ enc_temp_folder
 *.jpg
 *.txt
 *.pts
+
+#
+/openpiv-c--qt/GeneratedFiles
+/openpiv-c--qt/fftw3
+/openpiv-c--qt/openpiv-c++.vcxproj.filters
+/openpiv-c--qt/openpiv-c++.vcxproj
+/water_flow.cpp
