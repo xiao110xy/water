@@ -16,7 +16,7 @@ enc_temp_folder
 *.jpg
 *.txt
 *.pts
-
+*.users
 #
 /openpiv-c--qt/GeneratedFiles
 /openpiv-c--qt/fftw3
