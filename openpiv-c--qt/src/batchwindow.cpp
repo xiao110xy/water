@@ -99,18 +99,15 @@ void BatchWindow::commitSettings()
 {
     // Writing the varoius setting boxes to the program-wide Settings object
     _settings->setBatchMask(maskCheck->isChecked());
-    if (!maskCheck->isChecked())
-    {
+    if (!maskCheck->isChecked()){
         _settings->setIsMask(false);
     }
     _settings->setBatchFilter(filterCheck->isChecked());
-    if (threadingCheck->isChecked())
-    {
+    if (threadingCheck->isChecked()){
         imagesCheck->setEnabled(false);
         vectorsCheck->setEnabled(false);
     }
-    else
-    {
+    else {
         imagesCheck->setEnabled(true);
         vectorsCheck->setEnabled(true);
     }

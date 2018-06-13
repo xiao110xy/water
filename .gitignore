@@ -1,4 +1,4 @@
-# users
+﻿# users
 .vs
 #
 Debug
@@ -16,7 +16,8 @@ enc_temp_folder
 *.jpg
 *.txt
 *.pts
-*.users
+*.user
+*.aps
 #
 /openpiv-c--qt/GeneratedFiles
 /openpiv-c--qt/fftw3
