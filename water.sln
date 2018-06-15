@@ -11,6 +11,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "assist_water", "assist_wate
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "openpiv-c++", "openpiv-c--qt\openpiv-c++.vcxproj", "{15DC490E-9F18-3BF0-941B-9BAA75854AC2}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ImageControlPointSelect", "ImageControlPointSelect\ImageControlPointSelect.vcxproj", "{6233E3D5-87FC-3B94-96E8-CB5DE1A5A800}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -49,6 +51,12 @@ Global
 		{15DC490E-9F18-3BF0-941B-9BAA75854AC2}.Release|x64.ActiveCfg = Release|x64
 		{15DC490E-9F18-3BF0-941B-9BAA75854AC2}.Release|x64.Build.0 = Release|x64
 		{15DC490E-9F18-3BF0-941B-9BAA75854AC2}.Release|x86.ActiveCfg = Release|x64
+		{6233E3D5-87FC-3B94-96E8-CB5DE1A5A800}.Debug|x64.ActiveCfg = Debug|x64
+		{6233E3D5-87FC-3B94-96E8-CB5DE1A5A800}.Debug|x64.Build.0 = Debug|x64
+		{6233E3D5-87FC-3B94-96E8-CB5DE1A5A800}.Debug|x86.ActiveCfg = Debug|x64
+		{6233E3D5-87FC-3B94-96E8-CB5DE1A5A800}.Release|x64.ActiveCfg = Release|x64
+		{6233E3D5-87FC-3B94-96E8-CB5DE1A5A800}.Release|x64.Build.0 = Release|x64
+		{6233E3D5-87FC-3B94-96E8-CB5DE1A5A800}.Release|x86.ActiveCfg = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
