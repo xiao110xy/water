@@ -23,7 +23,7 @@
     <ProjectGuid>{8B50E1EE-5563-40BE-A809-9E23ADF5C552}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>assistwater</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.16299.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.17134.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -100,6 +100,9 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <StackReserveSize>10000000</StackReserveSize>
+      <GenerateMapFile>true</GenerateMapFile>
+      <MapFileName>xy.map</MapFileName>
+      <MapExports />
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -116,6 +119,9 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <StackReserveSize>10000000</StackReserveSize>
+      <GenerateMapFile>true</GenerateMapFile>
+      <MapFileName>xy.map</MapFileName>
+      <MapExports />
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -136,6 +142,9 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <StackReserveSize>10000000</StackReserveSize>
+      <GenerateMapFile>true</GenerateMapFile>
+      <MapFileName>xy.map</MapFileName>
+      <MapExports />
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -156,6 +165,9 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <StackReserveSize>10000000</StackReserveSize>
+      <GenerateMapFile>true</GenerateMapFile>
+      <MapFileName>xy.map</MapFileName>
+      <MapExports />
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>

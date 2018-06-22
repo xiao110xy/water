@@ -139,7 +139,7 @@ bool input_assist(string file_name, vector<assist_information> & assist_files, v
 		return true;
 }
 
-void compute_water_area(Mat im, vector<assist_information> &assist_files, string base_name)
+void compute_water_area(Mat im, vector<assist_information> &assist_files, string ref_name)
 {
 	int n = 0;
 	for (auto &assist_file:assist_files) {
@@ -152,14 +152,15 @@ void compute_water_area(Mat im, vector<assist_information> &assist_files, string
 		Mat image_rotate = correct_image(im, assist_file);
 		assist_file.base_image = image_rotate.rowRange(0, base_image.rows).clone();
 		// 获得水位线,两种方式选择
-		string ref_image_name = "ref_" + base_name +"_"+to_string(n+1) +".bmp";
+		string temp_sub(ref_name.begin(), ref_name.end() - 4);
+		temp_sub = temp_sub + "_" + to_string(n + 1) + string(ref_name.end() - 4, ref_name.end());
 		fstream _file;
-		_file.open(ref_image_name, ios::in);
+		_file.open(temp_sub, ios::in);
 		if (!_file) {
 			get_water_line(assist_file);// 不需要历史数据参考
 		}
 		else {
-			Mat ref_image = imread(ref_image_name);// 历史参考数据
+			Mat ref_image = imread(temp_sub);// 历史参考数据
 			get_water_line(assist_file, ref_image);
 		}
 		_file.close();
@@ -427,6 +428,8 @@ void get_water_line(assist_information & assist_file)
 	water_line = y2_1 < y2_2 ? y2_1 : y2_2;
 	assist_file.water_number = (1-(water_line + 1) / (double)assist_file.base_image.rows)*assist_file.length;
 }
+
+
 bool get_label_mask(Mat mask,int & label, Mat &label_mask, assist_information assist_file,int y_t)
 {
 	Mat data = mask.clone();
@@ -451,7 +454,7 @@ bool get_label_mask(Mat mask,int & label, Mat &label_mask, assist_information as
 	// 排除
 	for (int i = 0; i < y_t; ++i) {
 		for (int j = 0; j < mask.cols; ++j) {
-			if (mask.at<int>(i, j)>=0)
+			if (mask.at<int>(i, j)<0)
 				temp_label[mask.at<int>(i, j)].clear();
 		}
 	}
@@ -581,7 +584,7 @@ void get_water_line(assist_information & assist_file, Mat ref_image)
 
 }
 
-void save_file(Mat im, vector<assist_information> assist_files, string base_name, string image_result, string para_result)
+void save_file(Mat im, vector<assist_information> assist_files, map<string, string> main_ini)
 {
 	//结果保存
 	Mat result = im.clone();
@@ -590,9 +593,10 @@ void save_file(Mat im, vector<assist_information> assist_files, string base_name
 		assist_information temp = assist_files[i];
 		// 子部分
 		fstream _file;
-		_file.open("sub_"+base_name+"_"+ to_string(i+1)+".bmp", ios::in);
+		string temp_sub(main_ini["sub"].begin(), main_ini["sub"].end() - 4);
+		_file.open(temp_sub +"_"+ to_string(i+1)+".bmp", ios::in);
 		if (!_file) {
-			imwrite("sub_" + base_name + "_" + to_string(i + 1) + ".bmp", temp.base_image);
+			imwrite(temp_sub + "_" + to_string(i + 1) + ".bmp", temp.base_image);
 		}
 		_file.close();
 		// 画出水尺两侧域
@@ -628,7 +632,7 @@ void save_file(Mat im, vector<assist_information> assist_files, string base_name
 
 	}
 	// 读写图像
-	imwrite(image_result, result);
+	imwrite(main_ini["result_image"], result);
 	//fstream _file;
 	//_file.open(image_result, ios::in);
 	//if (!_file) {
@@ -638,7 +642,7 @@ void save_file(Mat im, vector<assist_information> assist_files, string base_name
 	// 读写文件
 	stable_sort(assist_files.begin(), assist_files.end(),
 		[](assist_information a, assist_information b) {return a.water_lines[0] < b.water_lines[0]; });
-	ofstream file(para_result);
+	ofstream file(main_ini["result_txt"]);
 	for (int i = 0; i < assist_files.size(); ++i) {
 		assist_information temp = assist_files[i];
 		file << "No=";
