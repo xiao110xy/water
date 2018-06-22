@@ -4,10 +4,11 @@
 Debug
 Release
 x64
+test
 #
-water_line/Debug
-water_line/Release
-water_line/x64
+*/Debug
+*/Release
+*/x64
 #
 enc_temp_folder
 #
@@ -21,6 +22,7 @@ enc_temp_folder
 *.vcxproj.filters
 *.vcxproj
 #
+
 /ImageControlPointSelect/GeneratedFiles
 /openpiv-c--qt/GeneratedFiles
 /openpiv-c--qt/fftw3
