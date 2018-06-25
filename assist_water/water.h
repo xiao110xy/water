@@ -7,6 +7,8 @@
 #include <fstream> 
 #include <iomanip>
 #include <io.h>
+#include"sift.h"
+#include"match.h"
 #include "MeanShiftSegmentor.h"
 struct assist_information {
 	// 基本信息
@@ -14,7 +16,7 @@ struct assist_information {
 	Mat wrap_image;
 	int length;
 	int add_row;
-	// roi
+	// roi 
 	vector<double> roi;
 	// 校正用点
 	vector<vector<double>> point;
@@ -34,6 +36,8 @@ struct assist_information {
 vector<string> getFiles(string folder, string firstname, string lastname);
 bool input_template(string file_name, vector<Mat> &template_image);
 bool input_assist(string file_name, vector<assist_information> &assist_files, vector<Mat> template_image);
+// 对原始影像进行配准
+vector<assist_information> correct_control_point(string file_name,Mat im,vector<assist_information>  &assist_files);
 // 处理主函数
 void compute_water_area(Mat im, vector<assist_information> &assist_files,string ref_name);
 // 几何校正原始影像

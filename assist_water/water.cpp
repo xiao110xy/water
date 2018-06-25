@@ -138,6 +138,60 @@ bool input_assist(string file_name, vector<assist_information> & assist_files, v
 	else
 		return true;
 }
+vector<assist_information> correct_control_point(string file_name,Mat im,vector<assist_information>& assist_files)
+{
+	// 
+	int n = 0;
+	for (auto &assist_file : assist_files) {
+		string temp = string(file_name.begin(), file_name.end() - 4) + "_" + to_string(n + 1) + string(file_name.end() - 4, file_name.end());
+		++n;
+		Mat temp_image = imread(temp, IMREAD_COLOR);
+		if (!temp_image.data)
+			continue;
+		// 将原始影像进行校正
+		Mat assist_image = temp_image(
+			Range(assist_file.roi[1], assist_file.roi[1] + assist_file.roi[3]),
+			Range(assist_file.roi[0], assist_file.roi[0] + assist_file.roi[2])
+		).clone();
+		//类对象
+
+		MySift sift(0, 3, 0.04, 10, 1.6, true);
+		//参考图像特征点检测和描述
+		vector<vector<Mat>> gauss_pyr_1, dog_pyr_1;
+		vector<KeyPoint> keypoints_1;
+		Mat descriptors_1;
+		double detect_1 = (double)getTickCount();
+		sift.detect(im, gauss_pyr_1, dog_pyr_1, keypoints_1);
+		sift.comput_des(gauss_pyr_1, keypoints_1, descriptors_1);
+		//待配准图像特征点检测和描述
+		vector<vector<Mat>> gauss_pyr_2, dog_pyr_2;
+		vector<KeyPoint> keypoints_2;
+		Mat descriptors_2;
+		sift.detect(assist_image, gauss_pyr_2, dog_pyr_2, keypoints_2);
+		sift.comput_des(gauss_pyr_2, keypoints_2, descriptors_2);
+		//最近邻与次近邻距离比匹配
+		double match_time = (double)getTickCount();
+		Ptr<DescriptorMatcher> matcher = new FlannBasedMatcher;
+		//Ptr<DescriptorMatcher> matcher = new BFMatcher(NORM_L2);
+		std::vector<vector<DMatch>> dmatchs;
+		matcher->knnMatch(descriptors_1, descriptors_2, dmatchs, 2);
+		//match_des(descriptors_1, descriptors_2, dmatchs, COS);
+
+		vector<DMatch> right_matchs;
+		Mat homography;
+		bool flag= match(im, assist_image, dmatchs, keypoints_1, keypoints_2,
+			"affine",right_matchs, homography);
+		if (!flag)
+			continue;
+		for (auto &point : assist_file.point) {
+			double x = point[2] - assist_file.roi[0];
+			double y = point[3] - assist_file.roi[1];
+			point[2] = x * homography.at<float>(0, 0) + y * homography.at<float>(0, 1) + homography.at<float>(0, 2);
+			point[3] = x * homography.at<float>(1, 0) + y * homography.at<float>(1, 1) + homography.at<float>(1, 2);
+		}
+	}
+	return vector<assist_information>();
+}
 
 void compute_water_area(Mat im, vector<assist_information> &assist_files, string ref_name)
 {
@@ -148,7 +202,7 @@ void compute_water_area(Mat im, vector<assist_information> &assist_files, string
 		Mat base_image = assist_file.base_image;
 		Mat add_image = Mat::zeros(Size(base_image.cols, assist_file.add_row), CV_64F);
 		vconcat(base_image, add_image, assist_file.wrap_image);
-		// 旋转校正
+		// 旋转校正 包含对原始影像进行矫正
 		Mat image_rotate = correct_image(im, assist_file);
 		assist_file.base_image = image_rotate.rowRange(0, base_image.rows).clone();
 		// 获得水位线,两种方式选择
@@ -167,7 +221,6 @@ void compute_water_area(Mat im, vector<assist_information> &assist_files, string
 		++n;
 	}
 }
-
 Mat correct_image(Mat im, assist_information &assist_file)
 {
 	Mat result,map_x,map_y;
@@ -180,10 +233,10 @@ Mat correct_image(Mat im, assist_information &assist_file)
 	vector<Point2d> points;
 	Point2d point1, point2;
 	// 左侧线段
-	Mat test_im = Mat::zeros(Size(2000, 2000), CV_8UC3);
+	//Mat test_im = Mat::zeros(Size(2000, 2000), CV_8UC3);
 	for (int i = 0; i < assist_file.wrap_image.rows; ++i) {
 		points.push_back(Point2d(map_x.at<float>(i, 0), map_y.at<float>(i, 0)));
-		circle(test_im, points[i], 1, Scalar(255, 0, 0));
+		//circle(test_im, points[i], 1, Scalar(255, 0, 0));
 		assist_file.parrallel_left.push_back(points[i]);
 	}
 	fitLine(points, line_para, CV_DIST_FAIR, 0, 1e-2, 1e-2);
@@ -201,14 +254,14 @@ Mat correct_image(Mat im, assist_information &assist_file)
 			point2.y = y;
 		}
 	}
-	line(test_im, point1, point2, Scalar(0, 255, 0));
+	//line(test_im, point1, point2, Scalar(0, 255, 0));
 	assist_file.parrallel_lines.push_back(point1);
 	assist_file.parrallel_lines.push_back(point2);
 	// 右侧线段
 	points.clear();
 	for (int i = 0; i < assist_file.wrap_image.rows; ++i) {
 		points.push_back(Point2d(map_x.at<float>(i, assist_file.wrap_image.cols-1), map_y.at<float>(i, assist_file.wrap_image.cols - 1)));
-		circle(test_im, points[i], 1, Scalar(255, 0, 0));
+		//circle(test_im, points[i], 1, Scalar(255, 0, 0));
 		assist_file.parrallel_right.push_back(points[i]);
 	}
 	fitLine(points, line_para, CV_DIST_FAIR, 0, 1e-2, 1e-2);
@@ -226,7 +279,7 @@ Mat correct_image(Mat im, assist_information &assist_file)
 			point2.y = y;
 		}
 	}
-	line(test_im, point1, point2, Scalar(0, 255, 0));
+	//line(test_im, point1, point2, Scalar(0, 255, 0));
 	assist_file.parrallel_lines.push_back(point1);
 	assist_file.parrallel_lines.push_back(point2);
 	return result;
@@ -326,6 +379,7 @@ void get_water_line(assist_information & assist_file)
 	int sigmarS = 30, sigmarR = 40;
 	int label;
 	int y1 = (int)floor(Edge_Detect(assist_file.wrap_image,3))+5;
+	y1 = y1 < assist_file.base_image.rows - 5 ? y1 : assist_file.base_image.rows / 2;
 	Mat mask, label_mask;
 	while (1) {
 		// 处理分割
@@ -454,7 +508,7 @@ bool get_label_mask(Mat mask,int & label, Mat &label_mask, assist_information as
 	// 排除
 	for (int i = 0; i < y_t; ++i) {
 		for (int j = 0; j < mask.cols; ++j) {
-			if (mask.at<int>(i, j)<0)
+			if (mask.at<int>(i, j)>=0)
 				temp_label[mask.at<int>(i, j)].clear();
 		}
 	}
@@ -775,43 +829,6 @@ double Edge_Detect(Mat im, int aperture_size)
 	vector<vector<vector<Point3f>>> E_area1 = get_pointline(dx, dy, points1, true, flag_image);
 	vector<vector<vector<Point3f>>> E_area2 = get_pointline(dx, dy, points2, false, flag_image);
 	//vector<vector<vector<Point3f>>> rest_point_line = select_point_line(E_area1, E_area2);
-	Mat temp[3];
-	temp[0] = data.clone(); temp[1] = data.clone(); temp[2] = data.clone();
-	merge(temp, 3, test_im);
-	Scalar rgb[3];
-	rgb[0] = Scalar(0, 255, 0);
-	rgb[1] = Scalar(0, 0, 255);
-	rgb[2] = Scalar(255, 0, 0);
-	for (auto i : E_area1) {
-		for (int j = 0; j<3; ++j)
-			for (auto k : i[j]) {
-				test_im.at<Vec3b>(k.y, k.x).val[0] = rgb[j].val[0];
-				test_im.at<Vec3b>(k.y, k.x).val[1] = rgb[j].val[1];
-				test_im.at<Vec3b>(k.y, k.x).val[2] = rgb[j].val[2];
-			}
-	}
-	rgb[1] = Scalar(0, 255, 0);
-	rgb[2] = Scalar(0, 0, 255);
-	rgb[0] = Scalar(255, 0, 0);
-	for (auto i : E_area2) {
-		for (int j = 0; j<3; ++j)
-			for (auto k : i[j]) {
-				test_im.at<Vec3b>(k.y, k.x).val[0] = rgb[j].val[0];
-				test_im.at<Vec3b>(k.y, k.x).val[1] = rgb[j].val[1];
-				test_im.at<Vec3b>(k.y, k.x).val[2] = rgb[j].val[2];
-			}
-	}
-	//rgb[0] = Scalar(0, 255, 0);
-	//rgb[1] = Scalar(0, 255, 255);
-	//rgb[2] = Scalar(255, 255, 0);
-	//for (auto i : rest_point_line) {
-	//	for (int j = 0; j<3; ++j)
-	//		for (auto k : i[j]) {
-	//			test_im.at<Vec3b>(k.y, k.x).val[0] = rgb[j].val[0];
-	//			test_im.at<Vec3b>(k.y, k.x).val[1] = rgb[j].val[1];
-	//			test_im.at<Vec3b>(k.y, k.x).val[2] = rgb[j].val[2];
-	//		}
-	//}
 	// 去除非中心区域
 	double result = 0.0;
 	vector<vector<vector<Point3f>>> E_area;
@@ -822,7 +839,7 @@ double Edge_Detect(Mat im, int aperture_size)
 	if (E_area.size() ==0)
 		return 0;
 	else
-		return (*((E_area[E_area.size()-1])[0].end() - 1)).y;
+		return (*((E_area[E_area.size()-1])[0].begin())).y;
 }
 
 Mat draw_part_E(Mat im, vector<vector<vector<Point3f>>> data)
@@ -963,25 +980,6 @@ vector<vector<vector<Point3f>>> get_pointline(Mat dx, Mat dy, vector<Point3f> po
 	}
 	test_im = draw_part_E(flag_image, temp_result);
 	// 暂时仅需要这个
-	return temp_result;
-	// 
-	if (x_points.size() == 0)
-		return result;
-	Vec4f line_para;
-	fitLine(x_points, line_para, CV_DIST_FAIR, 0, 1e-2, 1e-2);
-	temp_result.clear();
-	for (auto i : result) {
-		vector<Point3f> temp = i[0];
-		float x1, x2, d;
-		d = (temp[0].x - line_para[2])*line_para[0] + (temp[0].y - line_para[3])*line_para[1];
-		x1 = d * line_para[0] + line_para[2];
-		d = (temp[temp.size() - 1].x - line_para[2])*line_para[0] + (temp[temp.size() - 1].y - line_para[3])*line_para[1];
-		x2 = d * line_para[0] + line_para[2];
-		float x_t = (flag_image.cols / 12) > 3 ? flag_image.cols / 12 : 3;
-		if (abs(x1 - temp[0].x) > x_t || abs(x2 - temp[temp.size() - 1].x) > x_t)
-			continue;
-		temp_result.push_back(i);
-	}
 	return temp_result;
 }
 
