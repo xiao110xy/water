@@ -7,39 +7,37 @@
 
 	 使用前请将下面的OpenCVRoot修改为你的OpenCV编译输出目录
 -->
-
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-	<ImportGroup Label="PropertySheets" />
-	<PropertyGroup Label="UserMacros" />
-	<PropertyGroup>
-
-		<!-- 请把OpenCVRoot属性的值替换为你的OpenCV编译输出的目标目录，它包含x64、x86这样的子目录 -->
-		<OpenCVRoot>$(SolutionDir)opencv</OpenCVRoot>
-		
-		<!-- 指定INCLUDE路径-->
-		<IncludePath>$(OpenCVRoot)\include;$(IncludePath)</IncludePath>
-
-		<!-- 指定链接所需lib目录-->
-		<LibraryPath Condition="'$(Platform)'=='Win32'">$(OpenCVRoot)\lib;$(LibraryPath)</LibraryPath>
-		<LibraryPath Condition="'$(Platform)'=='X64'">$(OpenCVRoot)\lib;$(LibraryPath)</LibraryPath>
-
-		<!-- 保证系统处于Debug模式时，可以使用相对路径读取源代码目录下的文件，比如"lena.jpg"而不必是"d:/work/test/test/lena.jpg" -->
-		<LocalDebuggerWorkingDirectory>$(ProjectDir)</LocalDebuggerWorkingDirectory>
-		<DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
-
-		<!-- 让系统PATH临时包含指定的dll目录 -->
-		<LocalDebuggerEnvironment Condition="'$(Platform)'=='Win32'">PATH=%PATH%;$(OpenCVRoot)\bin</LocalDebuggerEnvironment> 
-		<LocalDebuggerEnvironment Condition="'$(Platform)'=='X64'">PATH=%PATH%;$(OpenCVRoot)\bin</LocalDebuggerEnvironment>
-	</PropertyGroup>
-
-	<!-- 以下是程序需要加载的lib文件。-->
-	<ItemDefinitionGroup>
-		<Link Condition="'$(Configuration)'=='Debug'">
-			<AdditionalDependencies>opencv_world341d.lib;%(AdditionalDependencies)</AdditionalDependencies>
-		</Link>
-		<Link Condition="'$(Configuration)'=='Release'">
-			<AdditionalDependencies>opencv_world341.lib;%(AdditionalDependencies)</AdditionalDependencies>
-		</Link>
-	</ItemDefinitionGroup>
-	<ItemGroup />
+  <ImportGroup Label="PropertySheets" />
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <!-- 请把OpenCVRoot属性的值替换为你的OpenCV编译输出的目标目录，它包含x64、x86这样的子目录 -->
+    <OpenCVRoot>$(SolutionDir)opencv</OpenCVRoot>
+    <!-- 指定INCLUDE路径-->
+    <IncludePath>$(OpenCVRoot)\include;$(IncludePath)</IncludePath>
+    <!-- 指定链接所需lib目录-->
+    <LibraryPath Condition="'$(Configuration)'=='Debug'">$(OpenCVRoot)\lib\;$(LibraryPath)</LibraryPath>
+    <LibraryPath Condition="'$(Configuration)'=='Release'">$(OpenCVRoot)\lib\;$(LibraryPath)</LibraryPath>
+    <!-- 保证系统处于Debug模式时，可以使用相对路径读取源代码目录下的文件，比如"lena.jpg"而不必是"d:/work/test/test/lena.jpg" -->
+    <LocalDebuggerWorkingDirectory>$(ProjectDir)</LocalDebuggerWorkingDirectory>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <!-- 让系统PATH临时包含指定的dll目录 -->
+    <LocalDebuggerEnvironment Condition="'$(Platform)'=='X64'">PATH=%PATH%;$(OpenCVRoot)\bin;$(OpenCVRoot)\bin\$(Configuration)</LocalDebuggerEnvironment>
+    <OutDir Condition="'$(Configuration)'=='Debug'">$(ProjectDir)</OutDir>
+    <OutDir Condition="'$(Configuration)'=='Release'">$(SolutionDir)$(Configuration)</OutDir>
+  </PropertyGroup>
+  <!-- 以下是程序需要加载的lib文件。-->
+  <ItemDefinitionGroup>
+    <Link Condition="'$(Configuration)'=='Debug'">
+      <AdditionalDependencies>opencv_world341d.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <Link Condition="'$(Configuration)'=='Release'">
+      <AdditionalDependencies>opencv_world341.lib;opencv_ts341.lib;IlmImf.lib;ippicvmt.lib;ippiw.lib;ittnotify.lib;libjasper.lib;libjpeg.lib;libpng.lib;libprotobuf.lib;libtiff.lib;libwebp.lib;zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <ClCompile>
+      <RuntimeLibrary Condition="'$(Configuration)'=='Debug'">MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeLibrary Condition="'$(Configuration)'=='Release'">MultiThreaded</RuntimeLibrary>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup />
 </Project>
