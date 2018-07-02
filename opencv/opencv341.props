@@ -35,7 +35,7 @@
       <AdditionalDependencies>opencv_world341.lib;opencv_ts341.lib;IlmImf.lib;ippicvmt.lib;ippiw.lib;ittnotify.lib;libjasper.lib;libjpeg.lib;libpng.lib;libprotobuf.lib;libtiff.lib;libwebp.lib;zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <ClCompile>
-      <RuntimeLibrary Condition="'$(Configuration)'=='Debug'">MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeLibrary Condition="'$(Configuration)'=='Debug'">MultiThreadedDebugDLL</RuntimeLibrary>
       <RuntimeLibrary Condition="'$(Configuration)'=='Release'">MultiThreaded</RuntimeLibrary>
     </ClCompile>
   </ItemDefinitionGroup>

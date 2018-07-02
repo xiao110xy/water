@@ -17,6 +17,7 @@ struct assist_information {
 	int length;
 	int add_row;
 	// roi 
+	Mat assist_image;
 	vector<double> roi;
 	// 校正用点
 	vector<vector<double>> point;
@@ -35,11 +36,12 @@ struct assist_information {
 // 读入辅助信息
 vector<string> getFiles(string folder, string firstname, string lastname);
 bool input_template(string file_name, vector<Mat> &template_image);
-bool input_assist(string file_name, vector<assist_information> &assist_files, vector<Mat> template_image);
-// 对原始影像进行配准
-vector<assist_information> correct_control_point(string file_name,Mat im,vector<assist_information>  &assist_files);
+bool input_assist_txt(string file_name, vector<assist_information> &assist_files, vector<Mat> template_image);
+bool input_assist_image(string file_name, vector<assist_information> &assist_files);
 // 处理主函数
-void compute_water_area(Mat im, vector<assist_information> &assist_files,string ref_name);
+bool compute_water_area(Mat im, vector<assist_information> &assist_files,string ref_name);
+// 对原始影像进行配准
+bool correct_control_point(Mat im, assist_information &assist_file);
 // 几何校正原始影像
 Mat correct_image(Mat im, assist_information &assist_file);
 void map_coord(assist_information &assist_file, Mat &map_x, Mat &map_y);
@@ -49,7 +51,7 @@ double compute_rms(Mat base_point, Mat wrap_point, Mat r);
 // 水位线识别
 void get_water_line(assist_information &assist_file);
 bool get_label_mask(Mat mask,int &label, Mat &label_mask, assist_information assist_file,int y_t);
-void get_water_line(assist_information &assist_file,Mat ref_image);
+float get_water_line(assist_information &assist_file,Mat ref_image);
 // 结果保存
 void save_file(Mat im, vector<assist_information> assist_files,map<string,string> main_ini);
 // 功能函数

@@ -9,7 +9,10 @@ vector<string> getFiles(string folder, string firstname, string lastname)
 	//文件信息  
 	struct _finddata_t fileinfo;   //大家可以去查看一下_finddata结构组成                            
 								   //以及_findfirst和_findnext的用法，了解后妈妈就再也不用担心我以后不会编了  
+
 	string p(folder);
+	if (folder == "")
+		p.append(".");
 	p.append("\\");
 	p.append(firstname);
 	p.append("*");
@@ -24,8 +27,8 @@ vector<string> getFiles(string folder, string firstname, string lastname)
 				getFiles(p.assign(folder).append("\\").append(fileinfo.name), files);*/
 			}
 			else {
-				string temp = p.assign(folder).append("\\").append(fileinfo.name);
-				files.push_back(p.assign(folder).append("\\").append(fileinfo.name));
+				string temp = p.assign(folder).append(fileinfo.name);
+				files.push_back(p.assign(folder).append(fileinfo.name));
 			}
 		} while (_findnext(hFile, &fileinfo) == 0);
 		_findclose(hFile);
@@ -49,7 +52,7 @@ bool input_template(string file_name, vector<Mat> &template_image)
 	return true;
 }
 
-bool input_assist(string file_name, vector<assist_information> & assist_files, vector<Mat> template_image)
+bool input_assist_txt(string file_name, vector<assist_information> & assist_files, vector<Mat> template_image)
 {
 	fstream assist_file_name(file_name);
 	string temp_name;
@@ -131,6 +134,7 @@ bool input_assist(string file_name, vector<assist_information> & assist_files, v
 			temp_point.push_back(temp);
 		}
 		temp_assist_file.point = temp_point;
+		temp_assist_file.water_number = 0;
 		assist_files.push_back(temp_assist_file);
 	}
 	if (assist_files.size() == 0)
@@ -138,62 +142,20 @@ bool input_assist(string file_name, vector<assist_information> & assist_files, v
 	else
 		return true;
 }
-vector<assist_information> correct_control_point(string file_name,Mat im,vector<assist_information>& assist_files)
+bool input_assist_image(string file_name, vector<assist_information>& assist_files)
 {
-	// 
 	int n = 0;
 	for (auto &assist_file : assist_files) {
 		string temp = string(file_name.begin(), file_name.end() - 4) + "_" + to_string(n + 1) + string(file_name.end() - 4, file_name.end());
 		++n;
 		Mat temp_image = imread(temp, IMREAD_COLOR);
 		if (!temp_image.data)
-			continue;
-		// 将原始影像进行校正
-		Mat assist_image = temp_image(
-			Range(assist_file.roi[1], assist_file.roi[1] + assist_file.roi[3]),
-			Range(assist_file.roi[0], assist_file.roi[0] + assist_file.roi[2])
-		).clone();
-		//类对象
-
-		MySift sift(0, 3, 0.04, 10, 1.6, true);
-		//参考图像特征点检测和描述
-		vector<vector<Mat>> gauss_pyr_1, dog_pyr_1;
-		vector<KeyPoint> keypoints_1;
-		Mat descriptors_1;
-		double detect_1 = (double)getTickCount();
-		sift.detect(im, gauss_pyr_1, dog_pyr_1, keypoints_1);
-		sift.comput_des(gauss_pyr_1, keypoints_1, descriptors_1);
-		//待配准图像特征点检测和描述
-		vector<vector<Mat>> gauss_pyr_2, dog_pyr_2;
-		vector<KeyPoint> keypoints_2;
-		Mat descriptors_2;
-		sift.detect(assist_image, gauss_pyr_2, dog_pyr_2, keypoints_2);
-		sift.comput_des(gauss_pyr_2, keypoints_2, descriptors_2);
-		//最近邻与次近邻距离比匹配
-		double match_time = (double)getTickCount();
-		Ptr<DescriptorMatcher> matcher = new FlannBasedMatcher;
-		//Ptr<DescriptorMatcher> matcher = new BFMatcher(NORM_L2);
-		std::vector<vector<DMatch>> dmatchs;
-		matcher->knnMatch(descriptors_1, descriptors_2, dmatchs, 2);
-		//match_des(descriptors_1, descriptors_2, dmatchs, COS);
-
-		vector<DMatch> right_matchs;
-		Mat homography;
-		bool flag= match(im, assist_image, dmatchs, keypoints_1, keypoints_2,
-			"affine",right_matchs, homography);
-		if (!flag)
-			continue;
-		for (auto &point : assist_file.point) {
-			double x = point[2] - assist_file.roi[0];
-			double y = point[3] - assist_file.roi[1];
-			point[2] = x * homography.at<float>(0, 0) + y * homography.at<float>(0, 1) + homography.at<float>(0, 2);
-			point[3] = x * homography.at<float>(1, 0) + y * homography.at<float>(1, 1) + homography.at<float>(1, 2);
-		}
+			return false;
+		assist_file.assist_image = temp_image.clone();
 	}
-	return vector<assist_information>();
+	return true;
 }
-
-void compute_water_area(Mat im, vector<assist_information> &assist_files, string ref_name)
+bool compute_water_area(Mat im, vector<assist_information> &assist_files, string ref_name)
 {
 	int n = 0;
 	for (auto &assist_file:assist_files) {
@@ -202,24 +164,92 @@ void compute_water_area(Mat im, vector<assist_information> &assist_files, string
 		Mat base_image = assist_file.base_image;
 		Mat add_image = Mat::zeros(Size(base_image.cols, assist_file.add_row), CV_64F);
 		vconcat(base_image, add_image, assist_file.wrap_image);
-		// 旋转校正 包含对原始影像进行矫正
-		Mat image_rotate = correct_image(im, assist_file);
-		assist_file.base_image = image_rotate.rowRange(0, base_image.rows).clone();
 		// 获得水位线,两种方式选择
 		string temp_sub(ref_name.begin(), ref_name.end() - 4);
 		temp_sub = temp_sub + "_" + to_string(n + 1) + string(ref_name.end() - 4, ref_name.end());
 		fstream _file;
 		_file.open(temp_sub, ios::in);
 		if (!_file) {
+			// 旋转校正 包含对原始影像进行矫正
+			Mat image_rotate = correct_image(im, assist_file);
+			assist_file.base_image = image_rotate.rowRange(0, base_image.rows).clone();
 			get_water_line(assist_file);// 不需要历史数据参考
+			cout << "no ref image" << endl;
 		}
 		else {
+			bool flag = correct_control_point(im, assist_file);
+			if (!flag)
+				continue;
+			// 旋转校正 包含对原始影像进行矫正
+			Mat image_rotate = correct_image(im, assist_file);
+			assist_file.base_image = image_rotate.rowRange(0, base_image.rows).clone();
 			Mat ref_image = imread(temp_sub);// 历史参考数据
-			get_water_line(assist_file, ref_image);
+			
+			assist_file.water_number = get_water_line(assist_file, ref_image);
+			double water_line = (1 - assist_file.water_number / assist_file.length)*assist_file.base_image.rows - 1;
+			Mat water_line_point = Mat::zeros(Size(2, 2), CV_64F);
+			water_line_point.at<double>(0, 0) = 0;
+			water_line_point.at<double>(0, 1) = water_line;
+			water_line_point.at<double>(1, 0) = assist_file.base_image.cols- 1;
+			water_line_point.at<double>(1, 1) = water_line;
+			water_line_point = compute_point(water_line_point, assist_file.r);
+			assist_file.water_lines.clear();
+			assist_file.water_lines.push_back(water_line_point.at<double>(0, 0));
+			assist_file.water_lines.push_back(water_line_point.at<double>(0, 1));
+			assist_file.water_lines.push_back(water_line_point.at<double>(1, 0));
+			assist_file.water_lines.push_back(water_line_point.at<double>(1, 1));
+			
 		}
 		_file.close();
 		++n;
 	}
+	return true;
+}
+bool correct_control_point(Mat im, assist_information & assist_file)
+{
+	// 将原始影像进行校正
+	if (!assist_file.assist_image.data)
+		return false;
+	Mat assist_image = assist_file.assist_image(
+		Range(assist_file.roi[1], assist_file.roi[1] + assist_file.roi[3]),
+		Range(assist_file.roi[0], assist_file.roi[0] + assist_file.roi[2])
+	).clone();
+	//类对象
+	MySift sift(0, 3, 0.04, 10, 1.6, true);
+	//参考图像特征点检测和描述
+	vector<vector<Mat>> gauss_pyr_1, dog_pyr_1;
+	vector<KeyPoint> keypoints_1;
+	Mat descriptors_1;
+	double detect_1 = (double)getTickCount();
+	sift.detect(im, gauss_pyr_1, dog_pyr_1, keypoints_1);
+	sift.comput_des(gauss_pyr_1, keypoints_1, descriptors_1);
+	//待配准图像特征点检测和描述
+	vector<vector<Mat>> gauss_pyr_2, dog_pyr_2;
+	vector<KeyPoint> keypoints_2;
+	Mat descriptors_2;
+	sift.detect(assist_image, gauss_pyr_2, dog_pyr_2, keypoints_2);
+	sift.comput_des(gauss_pyr_2, keypoints_2, descriptors_2);
+	//最近邻与次近邻距离比匹配
+	double match_time = (double)getTickCount();
+	Ptr<DescriptorMatcher> matcher = new FlannBasedMatcher;
+	//Ptr<DescriptorMatcher> matcher = new BFMatcher(NORM_L2);
+	std::vector<vector<DMatch>> dmatchs;
+	matcher->knnMatch(descriptors_1, descriptors_2, dmatchs, 2);
+	//match_des(descriptors_1, descriptors_2, dmatchs, COS);
+
+	vector<DMatch> right_matchs;
+	Mat homography;
+	bool flag = match(im, assist_image, dmatchs, keypoints_1, keypoints_2,
+		"similarity", right_matchs, homography);
+	if (right_matchs.size() < 6)
+		return false;
+	for (auto &point : assist_file.point) {
+		double x = point[2] - assist_file.roi[0];
+		double y = point[3] - assist_file.roi[1];
+		point[2] = x * homography.at<float>(0, 0) + y * homography.at<float>(0, 1) + homography.at<float>(0, 2);
+		point[3] = x * homography.at<float>(1, 0) + y * homography.at<float>(1, 1) + homography.at<float>(1, 2);
+	}
+	return true;
 }
 Mat correct_image(Mat im, assist_information &assist_file)
 {
@@ -574,7 +604,7 @@ bool get_label_mask(Mat mask,int & label, Mat &label_mask, assist_information as
 	return true;
 }
 
-void get_water_line(assist_information & assist_file, Mat ref_image)
+float get_water_line(assist_information & assist_file, Mat ref_image)
 {
 	Mat im = assist_file.base_image.clone();
 	int n = im.rows / assist_file.length;
@@ -582,30 +612,37 @@ void get_water_line(assist_information & assist_file, Mat ref_image)
 	float max_score = 0.5;
 	int c1 = im.cols / 2,c2 = im.cols;
 	// 一个E
+	float score;
 	for (int i = 0; i < (int)assist_file.length/5; ++i) {
 		int r1 = i * 5*n;
 		int r2 = (i + 1)*5*n;
-		Mat temp1 = i % 2 ==0 ? im(Range(r1,r2 ), Range(0,c1)) : 
-			im(Range(r1, r2), Range(c1,c2));
-		Mat temp2 = i % 2 ==0 ? ref_image(Range(r1, r2), Range(0, c1)) :
-			ref_image(Range(r1, r2), Range(c1, c2));
+		Mat temp1 = i % 2 ==0 ? im(Range(r1,r2), Range(0,c1)) : 
+			im(Range(r1, r2), Range(c1, c2));
+		int temp_step_r = n / 2;
+		int temp_step_c = (c2-c1) / 10;
+		Mat temp2 = i % 2 ==0 ? ref_image(Range(r1+ temp_step_r, r2- temp_step_r), Range(0 + temp_step_c, c1-temp_step_c)) :
+			ref_image(Range(r1+ temp_step_r, r2- temp_step_r), Range(c1 + temp_step_c, c2- temp_step_c));
 		Mat temp;
 		matchTemplate(temp1, temp2, temp, CV_TM_CCOEFF_NORMED);
-		max_score = max_score > temp.at<float>(0, 0)?max_score:temp.at<float>(0, 0);
-		if (temp.at<float>(0, 0) < 0.5*max_score) {
+		score = -2;
+		for (int i = 0; i < temp.total(); ++i) {
+			score = score > (*(temp.ptr<float>(0) + i)) ? score : (*(temp.ptr<float>(0) + i));
+		}
+		max_score = max_score > score?max_score: score;
+		if (score < 0.8*max_score) {
 			// E的小部分
 			for (int j = 0; j < 5; ++j) {
-				Mat temp_temp1 = temp1.rowRange(j*n,(j+1)*n);
-				Mat temp_temp2 = temp2.rowRange(j*n, (j + 1)*n);
+				Mat temp_temp1 = im.rowRange(r1+j*n, r1 + (j+1)*n);
+				Mat temp_temp2 = ref_image.rowRange(r1+j*n, r1 + (j + 1)*n);
 				Mat temp;
 				matchTemplate(temp_temp1, temp_temp2, temp, CV_TM_CCOEFF_NORMED);
-				if (temp.at<float>(0, 0) < 0.3*max_score) {
+				if (temp.at<float>(0, 0) < 0.6*max_score) {
 					for (int k = 0; k < n; ++k) {
-						Mat temp_temp_temp1 = temp_temp1.row(k);
-						Mat temp_temp_temp2 = temp_temp2.row(k);
+						Mat temp_temp_temp1 = im.row(r1 + j * n+k);
+						Mat temp_temp_temp2 = ref_image.row(r1 + j * n + k);
 						Mat temp;
 						matchTemplate(temp_temp_temp1, temp_temp_temp2, temp, CV_TM_CCOEFF_NORMED);
-						if (temp.at<float>(0, 0) < 0.2*max_score)
+						if (temp.at<float>(0, 0) < 0.4*max_score)
 							break;
 						else
 							score3.push_back(temp.at<float>(0, 0));
@@ -618,23 +655,13 @@ void get_water_line(assist_information & assist_file, Mat ref_image)
 			break;
 		}
 		else
-			score1.push_back(temp.at<float>(0, 0));
+			score1.push_back(score);
 	}
+	return assist_file.length - 5 * score1.size() - score2.size() - score3.size() / 10.0;
 	// water number
 	assist_file.water_number = assist_file.length-5*score1.size()-score2.size()-score3.size()/10.0;
 	//	water_line 
-	double water_line = (1-assist_file.water_number/assist_file.length)*assist_file.base_image.rows-1;
-	Mat water_line_point = Mat::zeros(Size(2, 2), CV_64F);
-	water_line_point.at<double>(0, 0) = 0;
-	water_line_point.at<double>(0, 1) = water_line;
-	water_line_point.at<double>(1, 0) = c2 - 1;
-	water_line_point.at<double>(1, 1) = water_line;
-	water_line_point = compute_point(water_line_point, assist_file.r);
-	assist_file.water_lines.clear();
-	assist_file.water_lines.push_back(water_line_point.at<double>(0, 0));
-	assist_file.water_lines.push_back(water_line_point.at<double>(0, 1));
-	assist_file.water_lines.push_back(water_line_point.at<double>(1, 0));
-	assist_file.water_lines.push_back(water_line_point.at<double>(1, 1));
+
 
 }
 
@@ -650,7 +677,7 @@ void save_file(Mat im, vector<assist_information> assist_files, map<string, stri
 		string temp_sub(main_ini["sub"].begin(), main_ini["sub"].end() - 4);
 		_file.open(temp_sub +"_"+ to_string(i+1)+".bmp", ios::in);
 		if (!_file) {
-			imwrite(temp_sub + "_" + to_string(i + 1) + ".bmp", temp.base_image);
+			cv::imwrite(temp_sub + "_" + to_string(i + 1) + ".bmp", temp.base_image);
 		}
 		_file.close();
 		// 画出水尺两侧域
@@ -661,32 +688,37 @@ void save_file(Mat im, vector<assist_information> assist_files, map<string, stri
 			circle(result, i, 1, Scalar(0, 0, 255), 1);
 		}
 		// 画出水尺区域线
-		line(result, temp.parrallel_lines[0], temp.parrallel_lines[1], Scalar(255, 0, 0), 2);
-		line(result, temp.parrallel_lines[2], temp.parrallel_lines[3], Scalar(255, 0, 0), 2);
-		// 画出水线
-		line(result, Point2d(temp.water_lines[0], temp.water_lines[1]), Point2d(temp.water_lines[2], temp.water_lines[3]), Scalar(0, 255, 0), 2);
-		// 画出数值
-		ostringstream ss;
-		ss << round(temp.water_number * 10) / 10;
-		string text = ss.str() + "cm";
-		int font_face = cv::FONT_HERSHEY_COMPLEX;
-		double font_scale = 1;
-		int thickness = 2;
-		//获取文本框的长宽 
-		int baseline;
-		Size text_size = cv::getTextSize(text, font_face, font_scale, thickness, &baseline);
-		Point2f temp_point;
-		temp_point.x = (temp.water_lines[0] + temp.water_lines[2]) / 2;
-		temp_point.y = (temp.water_lines[1] + temp.water_lines[3]) / 2;
-		if (temp_point.x < result.cols / 2)
-			temp_point.x = temp_point.x + 30;
-		else
-			temp_point.x = temp_point.x - 30 - text_size.width;
-		putText(result, text, temp_point, font_face, font_scale, cv::Scalar(0, 255, 255), thickness, 8, 0);
+		if (temp.parrallel_lines.size() == 4) {
+			line(result, temp.parrallel_lines[0], temp.parrallel_lines[1], Scalar(255, 0, 0), 2);
+			line(result, temp.parrallel_lines[2], temp.parrallel_lines[3], Scalar(255, 0, 0), 2);		
+		}
+		if (temp.water_lines.size() == 4){
+			// 画出水线
+			line(result, Point2d(temp.water_lines[0], temp.water_lines[1]), Point2d(temp.water_lines[2], temp.water_lines[3]), Scalar(0, 255, 0), 2);
+			// 画出数值
+			ostringstream ss;
+			ss << round(temp.water_number * 10) / 10;
+			string text = ss.str() + "cm";
+			int font_face = cv::FONT_HERSHEY_COMPLEX;
+			double font_scale = 1;
+			int thickness = 2;
+			//获取文本框的长宽 
+			int baseline;
+			Size text_size = cv::getTextSize(text, font_face, font_scale, thickness, &baseline);
+			Point2f temp_point;
+			temp_point.x = (temp.water_lines[0] + temp.water_lines[2]) / 2;
+			temp_point.y = (temp.water_lines[1] + temp.water_lines[3]) / 2;
+			if (temp_point.x < result.cols / 2)
+				temp_point.x = temp_point.x + 30;
+			else
+				temp_point.x = temp_point.x - 30 - text_size.width;
+			putText(result, text, temp_point, font_face, font_scale, cv::Scalar(0, 255, 255), thickness, 8, 0);
+		}
+
 
 	}
 	// 读写图像
-	imwrite(main_ini["result_image"], result);
+	cv::imwrite(main_ini["result_image"], result);
 	//fstream _file;
 	//_file.open(image_result, ios::in);
 	//if (!_file) {
@@ -694,7 +726,7 @@ void save_file(Mat im, vector<assist_information> assist_files, map<string, stri
 	//}
 	//_file.close();
 	// 读写文件
-	stable_sort(assist_files.begin(), assist_files.end(),
+	std::stable_sort(assist_files.begin(), assist_files.end(),
 		[](assist_information a, assist_information b) {return a.water_lines[0] < b.water_lines[0]; });
 	ofstream file(main_ini["result_txt"]);
 	for (int i = 0; i < assist_files.size(); ++i) {
@@ -941,8 +973,8 @@ vector<vector<vector<Point3f>>> get_pointline(Mat dx, Mat dy, vector<Point3f> po
 		fillPoly(mask, vector<vector<Point>>{draw_temp}, Scalar(255));
 		int num1 = 0, num2 = 0;
 		for (int i = 0; i < mask.total(); ++i) {
-			if (*(mask.ptr(0) + i) != 0) {
-				if (*(flag_image.ptr(0) + i) == 0)
+			if (*(mask.ptr<uchar>(0) + i) != 0) {
+				if (*(flag_image.ptr<uchar>(0) + i) == 0)
 					++num1;
 				else
 					++num2;

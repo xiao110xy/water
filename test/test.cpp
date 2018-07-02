@@ -20,7 +20,19 @@ void on_Trackbar(int, void*)
 
 int main(int argc,void **agrv)
 {
-	
+	vector<string> temp_names1 = getFiles("E:/water_line/28/temp", "", ".jpg");
+	vector<string> temp_names2 = getFiles("E:/water_line/28/temp", "result_", ".jpg");
+	ofstream outfile("E:/water_line/28/temp/1.txt");
+	for (auto names : temp_names2) {
+		for (auto name : temp_names1) {
+			if (("result_" + name) == names) {
+				outfile << name << endl;
+				break;
+			}
+		}
+
+	}
+	outfile.close();
 	//for (int i = 1; i < 9; ++i) {
 	//	ostringstream  ss;
 	//	ss << i;

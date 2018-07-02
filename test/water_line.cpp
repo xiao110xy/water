@@ -2004,7 +2004,7 @@ vector<string> getFiles(string folder, string firstname, string lastname)
 			}
 			else {
 				string temp = p.assign(folder).append("\\").append(fileinfo.name);
-				files.push_back(p.assign(folder).append("\\").append(fileinfo.name));
+				files.push_back(fileinfo.name);
 			}
 		} while (_findnext(hFile, &fileinfo) == 0);
 		_findclose(hFile);
