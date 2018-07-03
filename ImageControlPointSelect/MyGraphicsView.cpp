@@ -12,6 +12,8 @@ MyGraphicsView::MyGraphicsView(QWidget *parent)
 	base_point.setY(-9999);
 
 	green_circleGroup = nullptr;
+	roi_Group = nullptr;
+
 }
 
 MyGraphicsView::~MyGraphicsView()
@@ -106,6 +108,16 @@ void MyGraphicsView::resizeEvent(QResizeEvent *event)
 
 void MyGraphicsView::mousePressEvent(QMouseEvent *event)
 {
+	if (event->button() == Qt::LeftButton) {
+		float distance1, distance2;
+		QPointF temp_point = mapToScene(event->pos());
+		distance1 = pow(roi_left_top.x() - temp_point.x(), 2) + 
+					pow(roi_left_top.y() - temp_point.y(), 2);
+		distance2 = pow(roi_right_bottom.x() - temp_point.x(), 2) + 
+					pow(roi_right_bottom.y() - temp_point.y(), 2);
+		m_dragged1 = distance1 < distance2 ? true : false;
+		m_dragged2 = distance1 < distance2 ? false : true;
+	}
     if (event->button() ==  Qt::RightButton){
         int width = this->sceneRect().width();
         int height = this->sceneRect().height();
@@ -147,6 +159,40 @@ void MyGraphicsView::mousePressEvent(QMouseEvent *event)
 		}
 		emit(point_changed(base_point));
     }
+}
+void MyGraphicsView::mouseMoveEvent(QMouseEvent * event)
+{
+	if (m_dragged1 == true) {
+		QPointF temp_point = mapToScene(event->pos());
+		if (roi_Group == nullptr)
+			return;
+		if (temp_point.x() >= roi_right_bottom.x() ||
+			temp_point.y() >= roi_right_bottom.y())
+			return;
+		QPoint temp_left_top = temp_point.toPoint();
+		QRect temp = roi_Group->rect().toRect();
+		temp.setTopLeft(temp_left_top);
+		temp.setBottomRight(roi_right_bottom);
+		DrawRoi(temp);
+	}
+	if (m_dragged2 == true) {
+		QPointF temp_point = mapToScene(event->pos());
+		if (temp_point.x() <= roi_left_top.x() ||
+			temp_point.y() <= roi_left_top.y())
+			return;
+		if (roi_Group == nullptr)
+			return;
+		QPoint temp_right_bottom = temp_point.toPoint();
+		QRect temp = roi_Group->rect().toRect();
+		temp.setTopLeft(roi_left_top);
+		temp.setBottomRight(temp_right_bottom);
+		DrawRoi(temp);
+	}
+}
+void MyGraphicsView::mouseReleaseEvent(QMouseEvent * event)
+{
+	m_dragged1 = false;
+	m_dragged2 = false;
 }
 void MyGraphicsView::refresh_view()
 {
@@ -218,5 +264,43 @@ void MyGraphicsView::removeDrawPoint(int row)
 	this->scene()->removeItem(temp2);
 	text_list.erase(text_list.begin()+row);
 	
+}
+
+void MyGraphicsView::DrawRoi(QRect roi_rect)
+{
+	if (sceneRect().isEmpty())
+		return;
+
+	if (roi_Group != nullptr) {
+		this->scene()->removeItem(roi_Group);
+	}
+	roi_left_top = roi_rect.topLeft();
+	roi_right_bottom = roi_rect.bottomRight();
+	if (roi_left_top.x() <= 0 || roi_left_top.y() <= 0 ||
+		roi_right_bottom.x() >= this->scene()->width() ||
+		roi_right_bottom.y() >= this->scene()->height()) {
+		DrawRoi();
+		return;
+	}
+	roi_Group = new QGraphicsRectItem();
+	roi_Group->setFlags(QGraphicsItem::ItemIsSelectable |
+		QGraphicsItem::ItemIsMovable);
+	roi_Group->setRect(roi_rect);
+	roi_Group->setPen(QPen(Qt::red, 3, Qt::DashDotLine));
+	this->scene()->addItem(roi_Group);
+}
+
+void MyGraphicsView::DrawRoi()
+{
+	if (sceneRect().isEmpty())
+		return;
+	roi_left_top.setX(0 + sceneRect().width() / 3);
+	roi_left_top.setY(0 + sceneRect().height() / 3);
+	roi_right_bottom.setX(2 * sceneRect().width() / 3);
+	roi_right_bottom.setY(2 * sceneRect().height() / 3);
+	QRect roi_rect;
+	roi_rect.setTopLeft(roi_left_top);
+	roi_rect.setBottomRight(roi_right_bottom);
+	DrawRoi(roi_rect);
 }
 

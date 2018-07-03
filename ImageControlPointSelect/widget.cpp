@@ -57,8 +57,11 @@ void Widget::setupWindows()
 
 void Widget::setupConnections()
 {
+	connect(this, SIGNAL(draw_roi(QRect)), ui->graphicsView2, SLOT(DrawRoi(QRect)));
+
 	connect(ui->load_base_image, SIGNAL(clicked()), this, SLOT(pushbotton_load_base_image()));
 	connect(ui->load_wrap_image, SIGNAL(clicked()), this, SLOT(pushbotton_load_wrap_image()));
+	connect(ui->get_roi, SIGNAL(clicked()), this, SLOT(pushbotton_get_roi()));
     connect(ui->savePts, SIGNAL(clicked()), this, SLOT(pushbotton_savePts()));
 	connect(ui->reloadPts, SIGNAL(clicked()), this, SLOT(pushbotton_reloadPts()));
 
@@ -119,6 +122,7 @@ void Widget::pushbotton_load_wrap_image()
 		tr("Image Files (*.png *.jpg *.bmp)"));
 	if (qStrFilePath.isEmpty())
 		return;
+	//QString qStrFilePath="C:/Users/xy/Pictures/bing/20180701.jpg";
 	// 刷新
     ui->graphicsView1->refresh_view();
     ui->graphicsView2->refresh_view();
@@ -144,6 +148,21 @@ void Widget::pushbotton_load_wrap_image()
 	ui->graphicsView2->viewFit();
 }
 
+void Widget::pushbotton_get_roi()
+{
+	if (ui->graphicsView2->sceneRect().isEmpty())
+		return;
+	QPoint roi_left_top, roi_right_bottom;
+	roi_left_top.setX(0 + ui->graphicsView2->sceneRect().width() / 3);
+	roi_left_top.setY(0 + ui->graphicsView2->sceneRect().height() / 3);
+	roi_right_bottom.setX(2 * ui->graphicsView2->sceneRect().width() / 3);
+	roi_right_bottom.setY(2 * ui->graphicsView2->sceneRect().height() / 3);
+	QRect roi_rect;
+	roi_rect.setTopLeft(roi_left_top);
+	roi_rect.setBottomRight(roi_right_bottom);
+	emit(draw_roi(roi_rect));
+}
+
 void Widget::pushbotton_savePts()
 {
 	QString qStrFilePath = QFileDialog::getSaveFileName(this,
@@ -161,7 +180,9 @@ void Widget::pushbotton_savePts()
 	int row = ui->tableWidget->rowCount();
 	if (row > 0) {
 		Out << "0,0,0," << QString::number(row, 10) <<";"<<endl;
-		Out << "0,0,0,0;" << endl;
+		QRect temp = ui->graphicsView2->roi_Group->rect().toRect();
+		Out << temp.x()<<","<<temp.y() << "," <<
+			temp.width() << "," <<temp.height()<<";" << endl;
 		for (int i = 0; i < row; ++i) {
 			Out << ui->tableWidget->item(i, 0)->text() << ",";
 			Out << ui->tableWidget->item(i, 1)->text() << ","; 
@@ -215,6 +236,34 @@ void Widget::pushbotton_reloadPts()
 	ui->tableWidget->clearContents();//只清除表中数据，不清除表头内容
 	ui->tableWidget->setRowCount(nLine);
 	LineStr = txtInput.readLine();
+	temp_name = LineStr.toLocal8Bit();
+	temp.clear();
+	for (int i = 0; i < temp_name.size(); ++i) {
+		if (temp_name[i] >= 48 && temp_name[i] <= 57) {
+			double temp_value = 0;
+			int j = i;
+			int n = -1;
+			for (; j < temp_name.size(); ++j) {
+				if (temp_name[j] == 44 || temp_name[j] == 59) {
+					temp_value = n == -1 ? temp_value : temp_value / pow(10, j - n - 1);
+					temp.push_back(temp_value);
+					break;
+				}
+				if (temp_name[j] >= 48 && temp_name[j] <= 57) {
+					temp_value = temp_value * 10 + temp_name[j] - 48;
+				}
+				if (temp_name[j] == 46)
+					n = j;
+			}
+			i = j;
+		}
+	}
+	if (temp.size() == 4) {
+		if (temp[2] > 0 && temp[3] > 0) {
+			QRect temp_rect(temp[0],temp[1],temp[2],temp[3]);
+			emit(draw_roi(temp_rect));
+		}
+	}
 	for (int n = 0; n < nLine; ++n) {
 		vector<double> temp;
 		LineStr = txtInput.readLine();

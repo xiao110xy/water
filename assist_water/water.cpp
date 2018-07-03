@@ -241,7 +241,7 @@ bool correct_control_point(Mat im, assist_information & assist_file)
 	Mat homography;
 	bool flag = match(im, assist_image, dmatchs, keypoints_1, keypoints_2,
 		"similarity", right_matchs, homography);
-	if (right_matchs.size() < 6)
+	if (!flag||right_matchs.size() < 6)
 		return false;
 	for (auto &point : assist_file.point) {
 		double x = point[2] - assist_file.roi[0];
@@ -417,7 +417,7 @@ void get_water_line(assist_information & assist_file)
 		s.m_SigmaS = sigmarS;
 		s.m_SigmaR = sigmarR;
 		if (sigmarR <20) {
-			water_line = assist_file.base_image.rows - 1;
+			water_line = y1;
 			break;
 		}
 		s.SetImage(im);
@@ -739,22 +739,17 @@ void save_file(Mat im, vector<assist_information> assist_files, map<string, stri
 		for (int j = 0; j < temp.parrallel_lines.size(); ++j) {
 			file << fixed << setprecision(2) << temp.parrallel_lines[j].x;
 			file << ",";
-			file << fixed << setprecision(2) << temp.parrallel_lines[j].y;			
-			if ((j % 2) == 1)
-				file << ";";
-			else
-				file << ",";
+			file << fixed << setprecision(2) << temp.parrallel_lines[j].y;
+			file << ",";
 		}
+		file << ";";
 		file << endl;
 		file << "WaterLine=";
 		for (int j = 0; j < temp.water_lines.size(); ++j) {
 			file << fixed << setprecision(2) << temp.water_lines[j];
-			if ((j % 4) == 3)
-				file << ";";
-			else
-				file << ",";
+			file << ",";
 		}
-		file << endl;
+		file << ";"<<endl;
 	}
 	file.close();
 }

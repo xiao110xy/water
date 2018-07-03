@@ -41,10 +41,13 @@ private:
 	QGraphicsScene *m_graphicsScene2;
 	QImage left_qimage;
 	QImage right_qimage;
+signals:
+	void draw_roi(QRect rect);
 
 private slots:
 	void pushbotton_load_base_image();
 	void pushbotton_load_wrap_image();
+	void pushbotton_get_roi();
 	void pushbotton_savePts();
 	void pushbotton_reloadPts();
 };

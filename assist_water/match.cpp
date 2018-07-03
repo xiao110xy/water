@@ -949,6 +949,8 @@ bool match(const Mat &image_1, const Mat &image_2, const vector<vector<DMatch>> 
 	//使用ransac算法删除错误点对
 	vector<bool> inliers;
 	float rmse;
+	if (point_1.size() < 6 || point_2.size() < 6)
+		return false;
 	homography = ransac(point_1, point_2, model, ransac_error, inliers, rmse);
 	//提取出处正确匹配点对
 	auto itt = init_matchs.begin();
