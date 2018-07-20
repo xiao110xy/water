@@ -24,6 +24,8 @@ struct assist_information {
 	Mat r;
 	Mat r_inv;
 	double rms_1, rms_2;
+	//ref
+	int ref_index;
 	// 分割水位线
 	Mat segment_result;
 	vector<Point2d> parrallel_lines;
@@ -36,8 +38,9 @@ struct assist_information {
 // 读入辅助信息
 vector<string> getFiles(string folder, string firstname, string lastname);
 bool input_template(string file_name, vector<Mat> &template_image);
-bool input_assist_txt(string file_name, vector<assist_information> &assist_files, vector<Mat> template_image);
-bool input_assist_image(string file_name, vector<assist_information> &assist_files);
+bool input_assist_txt(Mat im,map<string, string> main_ini, vector<assist_information> &assist_files, vector<Mat> template_image);
+bool get_number(string line_string, vector<double> &temp);
+bool input_assist_image(string file_name,assist_information &assist_file);
 // 处理主函数
 bool compute_water_area(Mat im, vector<assist_information> &assist_files,string ref_name);
 // 对原始影像进行配准

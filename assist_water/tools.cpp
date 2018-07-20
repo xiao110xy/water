@@ -78,7 +78,7 @@ static const float atan2_p3 = -0.3258083974640975f*(float)(180 / CV_PI);
 static const float atan2_p5 = 0.1555786518463281f*(float)(180 / CV_PI);
 static const float atan2_p7 = -0.04432655554792128f*(float)(180 / CV_PI);
 
-void exp(const float * _x, float * y, int n)
+void xyexp(const float * _x, float * y, int n)
 {
 	static const float
 		A4 = (float)(1.000000000000002438532970795181890933776 / EXPPOLY_32F_A0),
@@ -171,7 +171,7 @@ void exp(const float * _x, float * y, int n)
 	}
 }
 
-void fastAtan2(const float * Y, const float * X, float * angle, int len, bool angleInDegrees)
+void xyfastAtan2(const float * Y, const float * X, float * angle, int len, bool angleInDegrees)
 {
 	int i = 0;
 	float scale = angleInDegrees ? 1 : (float)(CV_PI / 180);
@@ -200,7 +200,7 @@ void fastAtan2(const float * Y, const float * X, float * angle, int len, bool an
 	}
 }
 
-void magnitude(const float * x, const float * y, float * mag, int len)
+void xymagnitude(const float * x, const float * y, float * mag, int len)
 {
 	int i = 0;
 	for (; i < len; i++)

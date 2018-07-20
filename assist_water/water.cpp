@@ -52,112 +52,92 @@ bool input_template(string file_name, vector<Mat> &template_image)
 	return true;
 }
 
-bool input_assist_txt(string file_name, vector<assist_information> & assist_files, vector<Mat> template_image)
+bool input_assist_txt(Mat im,map<string, string> main_ini, vector<assist_information> & assist_files, vector<Mat> template_image)
 {
-	fstream assist_file_name(file_name);
+
+	fstream assist_file_name(main_ini["assist_txt"]);
+	if (!assist_file_name)
+		return false;
 	string temp_name;
 	while (!assist_file_name.eof())
 	{
-		vector<int> temp;
+		vector<double> temp;
 		assist_information temp_assist_file;
 		getline(assist_file_name, temp_name);
-		temp.clear();
-		for (int i = 0; i < temp_name.size(); ++i) {
-			int temp_value = 0;
-			int j = 0;
-			for (j = i; j < temp_name.size(); ++j) {
-				if (temp_name[j] >= 48 && temp_name[j] <= 57) {
-					temp_value = temp_value * 10 + temp_name[j] - 48;
-				}
-				else {
-					break;
-				}
-			}
-			i = j;
-			temp.push_back(temp_value);
-		}
-		if (temp.size() == 0|| assist_files.size() != temp[0]-1)
+		get_number(temp_name, temp);
+		if (temp.size() != 5)
 			break;
-		temp_assist_file.base_image = template_image[temp[1] - 1];
-		temp_assist_file.length = temp[2];
+		if (assist_files.size() != temp[0] - 1) {
+			for(int i =0;i<=temp[4];++i)
+				getline(assist_file_name, temp_name);
+			continue;
+		}
+		temp_assist_file.ref_index = temp[1];
+		input_assist_image(main_ini["assist_image"],temp_assist_file);
+		temp_assist_file.base_image = template_image[temp[2] - 1];
+		temp_assist_file.length = temp[3];
 		// roi
 		vector<double> roi;
 		getline(assist_file_name, temp_name);
-		for (int i = 0; i < temp_name.size(); ++i) {
-			if (temp_name[i] >= 48 && temp_name[i] <= 57) {
-				double temp_value = 0;
-				int j = i;
-				int n = -1;
-				for (; j < temp_name.size(); ++j) {
-					if (temp_name[j]==44||temp_name[j] == 59) {
-						temp_value = n == -1 ? temp_value : temp_value / pow(10, j - n - 1);
-						roi.push_back(temp_value);
-						break;
-					}
-					if (temp_name[j] >=48 && temp_name[j] <= 57) {
-						temp_value = temp_value * 10 + temp_name[j] - 48;
-					}
-					if (temp_name[j] == 46)
-						n = j;
-				}
-				i = j;
-			}
-		}
+		get_number(temp_name, roi);
 		if (roi.size() != 4)
 			break;
 		temp_assist_file.roi = roi;
 		// point
 		vector<vector<double>> temp_point;
-		for (int n = 0; n < temp[3]; ++n) {
+		for (int n = 0; n < temp[4]; ++n) {
 			getline(assist_file_name, temp_name);
 			vector<double> temp;
-			for (int i = 0; i < temp_name.size(); ++i) {
-				if (temp_name[i] >= 48 && temp_name[i] <= 57) {
-					double temp_value = 0;
-					int j = i;
-					int n = -1;
-					for (; j < temp_name.size(); ++j) {
-						if (temp_name[j] == 44 || temp_name[j] == 59) {
-							temp_value = n == -1 ? temp_value : temp_value / pow(10, j - n - 1);
-							temp.push_back(temp_value);
-							break;
-						}
-						if (temp_name[j] >= 48 && temp_name[j] <= 57) {
-							temp_value = temp_value * 10 + temp_name[j] - 48;
-						}
-						if (temp_name[j] == 46)
-							n = j;
-					}
-					i = j;
-				}
-			}
+			get_number(temp_name, temp);
 			temp_point.push_back(temp);
 		}
 		temp_assist_file.point = temp_point;
 		temp_assist_file.water_number = 0;
-		assist_files.push_back(temp_assist_file);
+		bool flag = correct_control_point(im, temp_assist_file);
+		if (flag)
+			assist_files.push_back(temp_assist_file);
 	}
 	if (assist_files.size() == 0)
 		return false;
 	else
 		return true;
 }
-bool input_assist_image(string file_name, vector<assist_information>& assist_files)
+bool get_number(string line_string, vector<double>& temp)
 {
-	int n = 0;
-	for (auto &assist_file : assist_files) {
-		string temp = string(file_name.begin(), file_name.end() - 4) + "_" + to_string(n + 1) + string(file_name.end() - 4, file_name.end());
-		++n;
-		Mat temp_image = imread(temp, IMREAD_COLOR);
-		if (!temp_image.data)
-			return false;
-		assist_file.assist_image = temp_image.clone();
+	temp.clear();
+	for (int i = 0; i < line_string.size(); ++i) {
+		if (line_string[i] >= 48 && line_string[i] <= 57) {
+			double temp_value = 0;
+			int j = i;
+			int n = -1;
+			for (; j < line_string.size(); ++j) {
+				if (line_string[j] == 44 || line_string[j] == 59) {
+					temp_value = n == -1 ? temp_value : temp_value / pow(10, j - n - 1);
+					temp.push_back(temp_value);
+					break;
+				}
+				if (line_string[j] >= 48 && line_string[j] <= 57) {
+					temp_value = temp_value * 10 + line_string[j] - 48;
+				}
+				if (line_string[j] == 46)
+					n = j;
+			}
+			i = j;
+		}
 	}
+	return true;
+}
+bool input_assist_image(string file_name, assist_information &assist_file)
+{
+	string temp = string(file_name.begin(), file_name.end() - 4) + "_" + to_string(assist_file.ref_index) + string(file_name.end() - 4, file_name.end());
+	Mat temp_image = imread(temp, IMREAD_COLOR);
+	if (!temp_image.data)
+		return false;
+	assist_file.assist_image = temp_image.clone();
 	return true;
 }
 bool compute_water_area(Mat im, vector<assist_information> &assist_files, string ref_name)
 {
-	int n = 0;
 	for (auto &assist_file:assist_files) {
 		// 延伸一部分水尺区域
 		assist_file.add_row = 25;
@@ -166,7 +146,7 @@ bool compute_water_area(Mat im, vector<assist_information> &assist_files, string
 		vconcat(base_image, add_image, assist_file.wrap_image);
 		// 获得水位线,两种方式选择
 		string temp_sub(ref_name.begin(), ref_name.end() - 4);
-		temp_sub = temp_sub + "_" + to_string(n + 1) + string(ref_name.end() - 4, ref_name.end());
+		temp_sub = temp_sub + "_" + to_string(assist_file.ref_index) + string(ref_name.end() - 4, ref_name.end());
 		fstream _file;
 		_file.open(temp_sub, ios::in);
 		if (!_file) {
@@ -177,9 +157,7 @@ bool compute_water_area(Mat im, vector<assist_information> &assist_files, string
 			cout << "no ref image" << endl;
 		}
 		else {
-			bool flag = correct_control_point(im, assist_file);
-			if (!flag)
-				continue;
+
 			// 旋转校正 包含对原始影像进行矫正
 			Mat image_rotate = correct_image(im, assist_file);
 			assist_file.base_image = image_rotate.rowRange(0, base_image.rows).clone();
@@ -201,7 +179,7 @@ bool compute_water_area(Mat im, vector<assist_information> &assist_files, string
 			
 		}
 		_file.close();
-		++n;
+
 	}
 	return true;
 }
@@ -260,12 +238,15 @@ Mat correct_image(Mat im, assist_information &assist_file)
 	// 将roi 即水尺区域的平行线保存
 	// 存在一些问题 需要使用拟合的方式进行一定的处理
 	Vec4f line_para;
-	vector<Point2d> points;
 	Point2d point1, point2;
+	vector<Point2f> points;
 	// 左侧线段
 	//Mat test_im = Mat::zeros(Size(2000, 2000), CV_8UC3);
+	//Mat temp_points1 = Mat::zeros(Size(2,assist_file.wrap_image.rows), CV_64F);
 	for (int i = 0; i < assist_file.wrap_image.rows; ++i) {
-		points.push_back(Point2d(map_x.at<float>(i, 0), map_y.at<float>(i, 0)));
+		points.push_back(Point2f(map_x.at<float>(i, 0), map_y.at<float>(i, 0)));
+		//temp_points1.at<double>(i, 0) = map_x.at<float>(i, 0);
+		//temp_points1.at<double>(i, 1) = map_y.at<float>(i, 0);
 		//circle(test_im, points[i], 1, Scalar(255, 0, 0));
 		assist_file.parrallel_left.push_back(points[i]);
 	}
@@ -290,7 +271,7 @@ Mat correct_image(Mat im, assist_information &assist_file)
 	// 右侧线段
 	points.clear();
 	for (int i = 0; i < assist_file.wrap_image.rows; ++i) {
-		points.push_back(Point2d(map_x.at<float>(i, assist_file.wrap_image.cols-1), map_y.at<float>(i, assist_file.wrap_image.cols - 1)));
+		points.push_back(Point2f(map_x.at<float>(i, assist_file.wrap_image.cols-1), map_y.at<float>(i, assist_file.wrap_image.cols - 1)));
 		//circle(test_im, points[i], 1, Scalar(255, 0, 0));
 		assist_file.parrallel_right.push_back(points[i]);
 	}
@@ -607,59 +588,140 @@ bool get_label_mask(Mat mask,int & label, Mat &label_mask, assist_information as
 float get_water_line(assist_information & assist_file, Mat ref_image)
 {
 	Mat im = assist_file.base_image.clone();
+	vector<float> score1,score2,score3,temp_score;
+	float max_score = -1;
 	int n = im.rows / assist_file.length;
-	vector<float> score1,score2,score3;
-	float max_score = 0.5;
+	float det_score = 0;
 	int c1 = im.cols / 2,c2 = im.cols;
+	int temp_step_r = n / 2;
+	int temp_step_c = (c2 - c1) / 10;
 	// 一个E
-	float score;
-	for (int i = 0; i < (int)assist_file.length/5; ++i) {
-		int r1 = i * 5*n;
-		int r2 = (i + 1)*5*n;
-		Mat temp1 = i % 2 ==0 ? im(Range(r1,r2), Range(0,c1)) : 
+	for (int i = 0; i < (int)assist_file.length / 5; ++i) {
+		// 一个E区域
+		int r1 = i * 5 * n;
+		int r2 = (i + 1) * 5 * n;
+		Mat temp1 = i % 2 == 0 ? im(Range(r1, r2), Range(0, c1)) :
 			im(Range(r1, r2), Range(c1, c2));
-		int temp_step_r = n / 2;
-		int temp_step_c = (c2-c1) / 10;
-		Mat temp2 = i % 2 ==0 ? ref_image(Range(r1+ temp_step_r, r2- temp_step_r), Range(0 + temp_step_c, c1-temp_step_c)) :
-			ref_image(Range(r1+ temp_step_r, r2- temp_step_r), Range(c1 + temp_step_c, c2- temp_step_c));
+		Mat temp2 = i % 2 == 0 ? ref_image(Range(r1 + temp_step_r, r2 - temp_step_r), Range(0 + temp_step_c, c1 - temp_step_c)) :
+			ref_image(Range(r1 + temp_step_r, r2 - temp_step_r), Range(c1 + temp_step_c, c2 - temp_step_c));
+		// 求score
 		Mat temp;
 		matchTemplate(temp1, temp2, temp, CV_TM_CCOEFF_NORMED);
-		score = -2;
-		for (int i = 0; i < temp.total(); ++i) {
-			score = score > (*(temp.ptr<float>(0) + i)) ? score : (*(temp.ptr<float>(0) + i));
+		//  求最大score
+		float score = -2;
+		for (int j = 0; j < temp.total(); ++j) {
+			score = score > (*(temp.ptr<float>(0) + j)) ? score : (*(temp.ptr<float>(0) + j));
 		}
-		max_score = max_score > score?max_score: score;
-		if (score < 0.8*max_score) {
-			// E的小部分
-			for (int j = 0; j < 5; ++j) {
-				Mat temp_temp1 = im.rowRange(r1+j*n, r1 + (j+1)*n);
-				Mat temp_temp2 = ref_image.rowRange(r1+j*n, r1 + (j + 1)*n);
-				Mat temp;
-				matchTemplate(temp_temp1, temp_temp2, temp, CV_TM_CCOEFF_NORMED);
-				if (temp.at<float>(0, 0) < 0.6*max_score) {
-					for (int k = 0; k < n; ++k) {
-						Mat temp_temp_temp1 = im.row(r1 + j * n+k);
-						Mat temp_temp_temp2 = ref_image.row(r1 + j * n + k);
-						Mat temp;
-						matchTemplate(temp_temp_temp1, temp_temp_temp2, temp, CV_TM_CCOEFF_NORMED);
-						if (temp.at<float>(0, 0) < 0.4*max_score)
-							break;
-						else
-							score3.push_back(temp.at<float>(0, 0));
-					}
-					break;
-				}
-				else
-					score2.push_back(temp.at<float>(0, 0));
-			}
-			break;
-		}
-		else
-			score1.push_back(score);
+		max_score = max_score > score ? max_score : score;
+		temp_score.push_back(score);
 	}
+	// 后处理
+	for (int i = 0; i < temp_score.size(); ++i) {
+		if (temp_score[i] < 0.8*max_score) {
+			if (i == 0||i== temp_score.size()-1) {
+				temp_score.erase(temp_score.begin() + i, temp_score.end());
+				break;
+			}
+			if (temp_score[i + 1] < 0.8*max_score) {
+				temp_score.erase(temp_score.begin() + i, temp_score.end());
+				break;
+			}
+			if ( fabs(temp_score[i + 1] - temp_score[i - 1]) > 0.1) {
+				temp_score.erase(temp_score.begin() + i, temp_score.end());
+				break;
+			}
+
+		}
+	}
+	score1 = temp_score;
+	if (score1.size() == (assist_file.length / 5))
+		return assist_file.length - 5 * score1.size();
+	temp_score.clear();
+	// 一个E区域的1/5
+	for (int i = 0; i < 5; ++i) {
+		int r1 = score1.size() * 5 * n + (i-1)* n;
+		int r2 = score1.size() * 5 * n + (i+1) * n;
+		r1 = r1 >= 0 ? r1 : 0;
+		r2 = r2 <= im.rows-1 ? r2 : im.rows - 1;
+		Mat temp1 = score1.size() % 2 == 0 ? im(Range(r1, r2), Range(0, c1)) :
+				im(Range(r1, r2), Range(c1, c2));
+		Mat temp2 = score1.size() % 2 == 0 ?
+				ref_image(Range(r1 , r2 ), Range(0 + temp_step_c, c1 - temp_step_c)) :
+				ref_image(Range(r1 , r2 ), Range(c1 + temp_step_c, c2 - temp_step_c));
+		Mat temp;
+		matchTemplate(temp1, temp2, temp, CV_TM_CCOEFF_NORMED);
+		float score = -2;
+		for (int i = 0; i < temp.total(); ++i) {
+			score = score >(*(temp.ptr<float>(0) + i)) ? score : (*(temp.ptr<float>(0) + i));
+		}
+		temp_score.push_back(score);
+	}
+	// 后处理
+	for (int i = 0; i < temp_score.size(); ++i) {
+		if (temp_score[i] < 0.5*max_score) {
+			if (i == 0 || i == temp_score.size() - 1) {
+				temp_score.erase(temp_score.begin()+i, temp_score.end());
+				break;
+			}
+			if (temp_score[i + 1] < 0.5*max_score) {
+				temp_score.erase(temp_score.begin() + i, temp_score.end());
+				break;
+			}
+			if (i>0&&fabs(temp_score[i + 1] - temp_score[i - 1]) > 0.1) {
+				temp_score.erase(temp_score.begin() + i, temp_score.end());
+				break;
+			}
+		}
+	}
+	score2 = temp_score;
+	temp_score.clear();
+	// 子部分的值
+	for (int i = 0; i < n; ++i) {
+		int r1 = score1.size()  * 5 * n  + score2.size() * n + i - 1;
+		int r2 = r1 + 1;
+		r1 = r1 >= 0 ? r1 : 0;
+		r2 = r2 <= im.rows - 1 ? r2 : im.rows - 1;
+		if (r1 == r2) {
+			temp_score.push_back(0.3*max_score+0.1);
+			continue;
+		}
+		Mat temp1 = score1.size() % 2 == 0 ?
+			im(Range(r1, r2), Range(0, c1)) :
+			im(Range(r1, r2), Range(c1, c2));
+		Mat temp2 = score1.size()  % 2 == 0 ?
+			ref_image(Range(r1 , r2 ), Range(0 + temp_step_c, c1 - temp_step_c)) :
+			ref_image(Range(r1 , r2 ), Range(c1 + temp_step_c, c2 - temp_step_c));
+		Mat temp;
+		matchTemplate(temp1, temp2, temp, CV_TM_CCOEFF_NORMED);
+		float score = -2;
+		for (int i = 0; i < temp.total(); ++i) {
+			score = score >(*(temp.ptr<float>(0) + i)) ? score : (*(temp.ptr<float>(0) + i));
+		}
+		temp_score.push_back(score);
+	}
+	// 后处理
+	for (int i = 0; i < temp_score.size() ; ++i) {
+		if (temp_score[i] < 0.3*max_score) {
+			if (i == 0 || i == temp_score.size() - 1) {
+				temp_score.erase(temp_score.begin() + i, temp_score.end());
+				break;
+			}
+			if (temp_score[i + 1] < 0.3*max_score) {
+				temp_score.erase(temp_score.begin() + i, temp_score.end());
+				break;
+			}
+			if (fabs(temp_score[i + 1] - temp_score[i - 1]) > 0.1) {
+				temp_score.erase(temp_score.begin() + i, temp_score.end());
+				break;
+			}
+		}
+	}
+	score3 = temp_score;
+	temp_score.clear();
 	return assist_file.length - 5 * score1.size() - score2.size() - score3.size() / 10.0;
+	//return assist_file.length - 5 * score1.size();
 	// water number
-	assist_file.water_number = assist_file.length-5*score1.size()-score2.size()-score3.size()/10.0;
+	//assist_file.water_number = assist_file.length-5*score1.size()-score2.size()-score3.size()/10.0;
 	//	water_line 
 
 
@@ -726,15 +788,16 @@ void save_file(Mat im, vector<assist_information> assist_files, map<string, stri
 	//}
 	//_file.close();
 	// 读写文件
-	std::stable_sort(assist_files.begin(), assist_files.end(),
-		[](assist_information a, assist_information b) {return a.water_lines[0] < b.water_lines[0]; });
 	ofstream file(main_ini["result_txt"]);
 	for (int i = 0; i < assist_files.size(); ++i) {
 		assist_information temp = assist_files[i];
 		file << "No=";
 		file << (i + 1) << ";" << endl;
 		file << "WaterLevel=";
-		file << fixed << setprecision(1) << round(temp.water_number * 10) / 10 << ";" << endl;
+		if (temp.water_lines.size() != 4|| temp.parrallel_lines.size() != 4)
+			file << ";" << endl;
+		else
+			file << fixed << setprecision(1) << round(temp.water_number * 10) / 10 << ";" << endl;
 		file << "GuageArea=";
 		for (int j = 0; j < temp.parrallel_lines.size(); ++j) {
 			file << fixed << setprecision(2) << temp.parrallel_lines[j].x;

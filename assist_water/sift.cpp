@@ -189,7 +189,7 @@ static float clac_orientation_hist(const Mat &image, Point pt, float scale, int 
 	int len = (2 * radius + 1)*(2 * radius + 1);//特征点邻域像素总个数（最大值）
 
 	float sigma = ORI_SIG_FCTR*scale;//特征点邻域高斯权重标准差(1.5*scale)
-	float exp_scale = -1.f / (2 * sigma*sigma);
+	float xyexp_scale = -1.f / (2 * sigma*sigma);
 
 	//使用AutoBuffer分配一段内存，这里多出4个空间的目的是为了方便后面平滑直方图的需要
 	AutoBuffer<float> buffer(4 * len + n + 4);
@@ -215,16 +215,16 @@ static float clac_orientation_hist(const Mat &image, Point pt, float scale, int 
 
 			float dx = image.at<float>(y,x+1) - image.at<float>(y,x-1);
 			float dy = image.at<float>(y + 1, x) - image.at<float>(y - 1, x);
-			X[k] = dx; Y[k] = dy; W[k] = (i*i + j*j)*exp_scale;
+			X[k] = dx; Y[k] = dy; W[k] = (i*i + j*j)*xyexp_scale;
 			++k;
 		}
 	}
 
 	len = k;
 	//计算邻域像素的梯度幅度,梯度方向，高斯权重
-	exp(W, W, len);
-	fastAtan2(Y, X, Ori, len, true);//角度范围0-360度
-	magnitude(X, Y, Mag, len);
+	xyexp(W, W, len);
+	xyfastAtan2(Y, X, Ori, len, true);//角度范围0-360度
+	xymagnitude(X, Y, Mag, len);
 
 
 	for (int i = 0; i < len; ++i)
@@ -508,7 +508,7 @@ static void calc_sift_descriptor(const Mat &gauss_image, float main_angle, Point
 	float cos_t = cosf(-main_angle*(float)(CV_PI / 180));
 	float sin_t = sinf(-main_angle*(float)(CV_PI / 180));
 	float bins_per_rad = n / 360.f;//n=8
-	float exp_scale = -1.f / (d*d*0.5f);
+	float xyexp_scale = -1.f / (d*d*0.5f);
 	float hist_width = DESCR_SCL_FCTR*scale;//每个网格的宽度
 	int radius = cvRound(hist_width*(d + 1)*sqrt(2)*0.5f);//特征点邻域半径
 
@@ -557,7 +557,7 @@ static void calc_sift_descriptor(const Mat &gauss_image, float main_angle, Point
 				Y[k] = dy;//竖直差分
 				RBin[k] = rbin;
 				CBin[k]=cbin;
-				W[k] = (c_rot*c_rot + r_rot*r_rot)*exp_scale;//高斯权值的指数部分
+				W[k] = (c_rot*c_rot + r_rot*r_rot)*xyexp_scale;//高斯权值的指数部分
 				++k;
 			}
 		}
@@ -565,9 +565,9 @@ static void calc_sift_descriptor(const Mat &gauss_image, float main_angle, Point
 
 	//计算像素梯度幅度，梯度角度，和高斯权值
 	len = k;
-	fastAtan2(Y, X, Angle, len, true);//角度范围是0-360度
-	magnitude(X, Y, Mag, len);//幅度
-	exp(W, W,k);//高斯权值
+	xyfastAtan2(Y, X, Angle, len, true);//角度范围是0-360度
+	xymagnitude(X, Y, Mag, len);//幅度
+	xyexp(W, W,k);//高斯权值
 
 	//计算每个特征点的描述子
 	for (k = 0; k < len; ++k)
