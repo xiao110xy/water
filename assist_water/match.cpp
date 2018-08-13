@@ -924,7 +924,7 @@ void match_des(const Mat &des_1, const Mat &des_2, vector<vector<DMatch>> &dmatc
  该函数返回变换模型参数
  */
 bool match(const Mat &image_1, const Mat &image_2, const vector<vector<DMatch>> &dmatchs, vector<KeyPoint> keys_1,
-	       vector<KeyPoint> keys_2,string model,vector<DMatch> &right_matchs,Mat &homography)
+	       vector<KeyPoint> keys_2,string model,vector<DMatch> &right_matchs,Mat &homography, Mat& matched_line)
 {
 	//获取初始匹配的关键点的位置
 	vector<Point2f> point_1, point_2;
@@ -952,13 +952,28 @@ bool match(const Mat &image_1, const Mat &image_2, const vector<vector<DMatch>> 
 	if (point_1.size() < 6 || point_2.size() < 6)
 		return false;
 	homography = ransac(point_1, point_2, model, ransac_error, inliers, rmse);
-	//提取出处正确匹配点对
+	//提取出正确匹配点对
+	vector<DMatch> temp_matchs;
 	auto itt = init_matchs.begin();
 	for (auto it = inliers.begin(); it != inliers.end(); ++it, ++itt){
 		if (*it){
 			//如果是正确匹配点对
 			right_matchs.push_back((*itt));
 		}
+		temp_matchs.push_back((*itt));
+
 	}
+
+
+	//绘制正确匹配点对连线图
+	drawMatches(image_1, keys_1, image_2, keys_2, right_matchs,
+		matched_line, Scalar(0, 255, 0), Scalar(255, 0, 0),
+		vector<char>(), 2);
+	//Mat matched_line2;
+	//drawMatches(image_1, keys_1, image_2, keys_2, temp_matchs,
+	//	matched_line2, Scalar(0, 255, 0), Scalar(255, 0, 0),
+	//	vector<char>(), 2);
+
+
 	return true;
 }
