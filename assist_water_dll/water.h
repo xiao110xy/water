@@ -20,11 +20,10 @@ struct assist_information {
 	// roi 
 	Mat assist_image;
 	vector<double> roi;
-	bool roi_flag = false;
 	// 摄像头抖动
-	bool correct_flag = false;
-	vector<vector<double>> correct_point;
-	//float correct_line;
+	bool correct_flag;
+	vector<vector<float>> correct_point;
+	float correct_line;
 	// 校正用点
 	vector<vector<double>> point;
 	Mat r;
@@ -65,7 +64,7 @@ bool get_label_mask(Mat mask,int &label, Mat &label_mask, assist_information ass
 float get_water_line_t2b(assist_information &assist_file);
 float match_template_score(Mat temp1, Mat temp2);
 float get_water_line(assist_information &assist_file,Mat ref_image);
-vector<float> process_score(vector<float> score, float score_t1, float score_t2);
+vector<float> process_score(vector<float> score, float score_t);
 // 结果保存
 void save_file(Mat im, vector<assist_information> assist_files,map<string,string> main_ini);
 // 功能函数
