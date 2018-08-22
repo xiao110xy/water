@@ -316,7 +316,7 @@ int *RegionList::GetRegionIndeces(int regionNum)
 /*        the calling function.                        */
 /*******************************************************/
 
-void RegionList::ErrorHandler(char *functName, char* errmsg, ErrorType status)
+void RegionList::ErrorHandler(const char *functName, const char* errmsg, ErrorType status)
 {
 
 	//flag error message on behalf of calling function, error format

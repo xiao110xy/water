@@ -11,16 +11,24 @@
 #include"sift.h"
 #include"match.h"
 #include "MeanShiftSegmentor.h"
+struct assist_registration {
+	int distance_to_left=9999;
+	Mat match_line_image;
+	Mat homography;
+	vector<vector<double>> points;
+	bool flag;
+};
 struct assist_information {
 	// 基本信息
 	Mat base_image;
 	Mat wrap_image;
 	int length;
 	int add_row;
+	int ruler_number=1;
 	// roi 
 	Mat assist_image;
 	vector<double> roi;
-	bool roi_flag = false;
+	int roi_order = 1;
 	// 摄像头抖动
 	bool correct_flag = false;
 	vector<vector<double>> correct_point;
@@ -45,14 +53,17 @@ struct assist_information {
 
 // 读入辅助信息
 vector<string> getFiles(string folder, string firstname, string lastname);
-bool input_template(string file_name, vector<Mat> &template_image);
 bool input_assist(Mat im,map<string, string> main_ini, vector<assist_information> &assist_files, vector<Mat> template_image);
 bool get_number(string line_string, vector<double> &temp);
 bool input_assist_image(string file_name,assist_information &assist_file);
 // 处理主函数
 int compute_water_area(Mat im, vector<assist_information> &assist_files,string ref_name);
+// 判断是白天还是黑夜
+bool isgrayscale(Mat im);
 // 对原始影像进行配准
 bool correct_control_point(Mat im, assist_information &assist_file);
+vector<assist_registration> xy_match(const Mat &image_1, const Mat &image_2, vector<vector<DMatch>> &dmatchs, vector<KeyPoint> keys_1,
+	vector<KeyPoint> keys_2, string model,assist_information  assist_file);
 // 几何校正原始影像
 Mat correct_image(Mat im, assist_information &assist_file);
 void map_coord(assist_information &assist_file, Mat &map_x, Mat &map_y);

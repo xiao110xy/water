@@ -36,21 +36,6 @@ vector<string> getFiles(string folder, string firstname, string lastname)
 	return files;
 }
 
-bool input_template(string file_name, vector<Mat> &template_image)
-{
-	FileStorage fs(file_name, FileStorage::READ);
-	fs["model"] >> template_image;
-	if (template_image.size() == 0)
-	{
-		return false;
-	}
-	for (auto &i : template_image) {
-		if (i.dims != 1) {
-			i.convertTo(i, CV_BGR2GRAY);
-		}
-	}
-	return true;
-}
 
 bool input_assist(Mat im,map<string, string> main_ini, vector<assist_information> & assist_files, vector<Mat> template_image)
 {
@@ -59,17 +44,25 @@ bool input_assist(Mat im,map<string, string> main_ini, vector<assist_information
 	if (!assist_file_name)
 		return false;
 	string temp_name;
+	getline(assist_file_name, temp_name);
+	vector<double> temp;
+	get_number(temp_name, temp);
+	int ruler_number = temp[0];
 	assist_files.clear();
 	while (!assist_file_name.eof())
 	{
-		vector<double> temp;
+		temp.clear();
 		assist_information temp_assist_file;
 		temp_assist_file.correct_flag = false;
+
+		// 多少个水尺
+		temp_assist_file.ruler_number = ruler_number;
+		//
 		getline(assist_file_name, temp_name);
 		get_number(temp_name, temp);
 		if (temp.size() != 5) {
 			if (temp.size() == 6) {
-				temp_assist_file.roi_flag = temp[4];
+				temp_assist_file.roi_order = temp[4];
 			}
 			else
 				break;
@@ -77,7 +70,13 @@ bool input_assist(Mat im,map<string, string> main_ini, vector<assist_information
 		int n_water = temp[0];
 		temp_assist_file.ref_index = temp[1];
 		input_assist_image(main_ini["assist_image"],temp_assist_file);
-		temp_assist_file.base_image = template_image[temp[2] - 1];
+		// 读取模板图片
+		string temp_name = string(main_ini["template"].begin(), main_ini["template"].end() - 4) 
+				+ "_" + to_string((int)temp[2]) + string(main_ini["template"].end() - 4, main_ini["template"].end());
+		Mat template_image = imread(temp_name, IMREAD_GRAYSCALE);
+		if (!template_image.data)
+			return false;
+		temp_assist_file.base_image = template_image;
 		temp_assist_file.length = temp[3];
 		// roi
 		vector<double> roi;
@@ -172,6 +171,7 @@ int compute_water_area(Mat im, vector<assist_information> &assist_files, string 
 		// 延伸一部分水尺区域
 		assist_file.add_row = 25;
 		Mat base_image = assist_file.base_image;
+		base_image.convertTo(base_image, CV_64F);
 		Mat add_image = Mat::zeros(Size(base_image.cols, assist_file.add_row), CV_64F);
 		vconcat(base_image, add_image, assist_file.wrap_image);
 		// 获得水位线,两种方式选择
@@ -185,7 +185,6 @@ int compute_water_area(Mat im, vector<assist_information> &assist_files, string 
 			assist_file.base_image = image_rotate.rowRange(0, base_image.rows).clone();
 			get_water_line(assist_file);// 不需要历史数据参考
 			cout << "no ref image" << endl;
-
 		}
 		else {
 			// 判断是否为无图像区域
@@ -219,7 +218,8 @@ int compute_water_area(Mat im, vector<assist_information> &assist_files, string 
 			Mat image_rotate = correct_image(im, assist_file);
 			assist_file.base_image = image_rotate.rowRange(0, base_image.rows).clone();
 			Mat ref_image = imread(temp_ref);// 历史参考数据
-			if (assist_file.correct_point.size()>0)
+
+			if (assist_file.correct_point.size()>3)
 				assist_file.water_number = get_water_line(assist_file, ref_image);
 			else
 				assist_file.water_number = get_water_line_t2b(assist_file);
@@ -245,17 +245,39 @@ int compute_water_area(Mat im, vector<assist_information> &assist_files, string 
 	}
 	return 0;
 }
-bool correct_control_point(Mat im, assist_information & assist_file)
+bool isgrayscale(Mat im)
 {
-	// 将原始影像进行校正
-	Mat im_temp ;
-	if (assist_file.roi_flag) {
-		im_temp = im(Range(assist_file.roi[1], assist_file.roi[1] + assist_file.roi[3]),
-			Range(assist_file.roi[0], assist_file.roi[0] + assist_file.roi[2])).clone();
+	Mat temp = im.clone();
+	if (temp.channels() == 3) {
+		temp.convertTo(temp, CV_8UC3);
+		cv::Vec3b * data = temp.ptr<cv::Vec3b>(0);
+		float num = 0;
+		for (int i = 0; i < temp.total(); ++i) {
+			int score = abs((data[i])[0] - (data[i])[1]);
+			score += abs((data[i])[1] - (data[i])[2]);
+			score += abs((data[i])[0] - (data[i])[2]);
+			if (score < 3)
+				++num;
+		}
+		if (num / temp.total() < 0.9) {
+			return false;
+		}
+		else {
+			return true;
+		}
+		return false;
 	}
 	else {
-		im_temp = im.clone();
+		return true;
 	}
+
+}
+bool correct_control_point(Mat im, assist_information & assist_file)
+{
+	string model = "similarity";
+	// 将原始影像进行校正
+	Mat im_temp ;
+	im_temp = im.clone();
 	if (!assist_file.assist_image.data)
 		return false;
 	Mat assist_image = assist_file.assist_image(
@@ -263,7 +285,7 @@ bool correct_control_point(Mat im, assist_information & assist_file)
 		Range(assist_file.roi[0], assist_file.roi[0] + assist_file.roi[2])
 	).clone();
 	//类对象
-	MySift sift(0, 3, 0.01, 10, 1.6, true);
+	MySift sift(0, 5, 0.1, 10, 1.5, true);
 	//参考图像特征点检测和描述
 	vector<vector<Mat>> gauss_pyr_1, dog_pyr_1;
 	vector<KeyPoint> keypoints_1;
@@ -278,42 +300,61 @@ bool correct_control_point(Mat im, assist_information & assist_file)
 	sift.detect(assist_image, gauss_pyr_2, dog_pyr_2, keypoints_2);
 	sift.comput_des(gauss_pyr_2, keypoints_2, descriptors_2);
 	//最近邻与次近邻距离比匹配
-	double match_time = (double)getTickCount();
 	Ptr<DescriptorMatcher> matcher = new FlannBasedMatcher;
-	//Ptr<DescriptorMatcher> matcher = new BFMatcher(NORM_L2);
 	std::vector<vector<DMatch>> dmatchs;
 	matcher->knnMatch(descriptors_1, descriptors_2, dmatchs, 2);
-	//match_des(descriptors_1, descriptors_2, dmatchs, COS);
-
-	vector<DMatch> right_matchs;
-	Mat homography,match_line_image;
-	bool flag = match(im_temp, assist_image, dmatchs, keypoints_1, keypoints_2,
-		"similarity", right_matchs, homography, match_line_image);
-	// 点的个数
+	// 不使用roi
+	Mat homography, match_line_image;
 	vector<vector<double>> temp_point;
-	for (auto i : right_matchs) {
-		vector<double> temp;
-		temp.push_back(keypoints_1[i.queryIdx].pt.x);
-		temp.push_back(keypoints_1[i.queryIdx].pt.y);
-		if (assist_file.roi_flag) {
+	vector<assist_registration> temp_assist_reg = xy_match(im_temp, assist_image, dmatchs,keypoints_1,keypoints_2,
+													model,assist_file);
+	if (temp_assist_reg.size() == assist_file.ruler_number) {
+		homography = temp_assist_reg[assist_file.roi_order-1].homography.clone();
+		temp_point = temp_assist_reg[assist_file.roi_order -1].points;
+		match_line_image = temp_assist_reg[assist_file.roi_order - 1].match_line_image;
+	}
+	else {
+		// 使用roi
+		// 将原始影像进行校正
+		im_temp = im(Range(assist_file.roi[1], assist_file.roi[1] + assist_file.roi[3]),
+			Range(assist_file.roi[0], assist_file.roi[0] + assist_file.roi[2])).clone();
+		//参考图像特征点检测和描述
+		vector<vector<Mat>> gauss_pyr_3, dog_pyr_3;
+		vector<KeyPoint> keypoints_3;
+		Mat descriptors_3;
+		sift.detect(im_temp, gauss_pyr_3, dog_pyr_3, keypoints_3);
+		sift.comput_des(gauss_pyr_3, keypoints_3, descriptors_3);
+		//最近邻与次近邻距离比匹配
+		Ptr<DescriptorMatcher> matcher = new FlannBasedMatcher;
+		std::vector<vector<DMatch>> dmatchs;
+		matcher->knnMatch(descriptors_3, descriptors_2, dmatchs,2);
+		vector<DMatch> right_matchs;
+		bool flag = match(im_temp, assist_image,  dmatchs, keypoints_3, keypoints_2,
+			model, right_matchs, homography, match_line_image);
+		if (!flag || right_matchs.size() < 5)
+			return false;
+		// 点的个数
+		for (auto i : right_matchs) {
+			vector<double> temp;
+			temp.push_back(keypoints_3[i.queryIdx].pt.x);
+			temp.push_back(keypoints_3[i.queryIdx].pt.y);
 			temp[0] += assist_file.roi[0];
 			temp[1] += assist_file.roi[1];
+			temp.push_back(keypoints_2[i.trainIdx].pt.x);
+			temp.push_back(keypoints_2[i.trainIdx].pt.y);
+			temp_point.push_back(temp);
 		}
-		temp_point.push_back(temp);
-	}
-	vector<vector<double>>::iterator new_end;
-	new_end = std::unique(temp_point.begin(),temp_point.end(),
-		[](const vector<double>&a, const vector<double>&b) {
-		for (int i = 0; i < a.size(); ++i) {
-			if (abs(a[i]-b[i])>1)
-				return false;
-		}
-		return true;});
-	temp_point.erase(new_end, temp_point.end());
-	if (!flag|| temp_point.size() < 6)
-		return false;
-	//
-	if (assist_file.roi_flag) {
+		vector<vector<double>>::iterator new_end;
+		new_end = std::unique(temp_point.begin(), temp_point.end(),
+			[](const vector<double>&a, const vector<double>&b) {
+			for (int i = 0; i < a.size(); ++i) {
+				if (abs(a[i] - b[i]) > 1)
+					return false;
+			}
+			return true; });
+		temp_point.erase(new_end, temp_point.end());
+		if (temp_point.size() < 5)
+			return false;
 		homography.at<float>(0, 2) += assist_file.roi[0];
 		homography.at<float>(1, 2) += assist_file.roi[1];
 	}
@@ -329,12 +370,12 @@ bool correct_control_point(Mat im, assist_information & assist_file)
 	// 判断在尺子内的个数
 	Mat r_inv = GeoCorrect2Poly(assist_file, false);
 	Mat point1,point2 = vector2Mat(temp_point);
-	point1 = compute_point(point2, r_inv);
+	point1 = compute_point(point2.colRange(0,2), r_inv);
 	vector<vector<double>> correct_points;
 	for (int i = 0; i < temp_point.size(); ++i) {
-		if (point1.at<double>(i, 0) < 0.1*assist_file.base_image.cols)
+		if (point1.at<double>(i, 0) < -0.1*assist_file.base_image.cols)
 			continue;
-		if (point1.at<double>(i, 1) < 0.1*assist_file.base_image.rows)
+		if (point1.at<double>(i, 1) < -0.1*assist_file.base_image.rows)
 			continue;
 		if (point1.at<double>(i, 0) > 1.1*assist_file.base_image.cols)
 			continue;
@@ -351,6 +392,92 @@ bool correct_control_point(Mat im, assist_information & assist_file)
 	assist_file.correct_point = correct_points;
 
 	return true;
+}
+vector<assist_registration> xy_match(const Mat & image_1, const Mat & image_2,  vector<vector<DMatch>>& dmatchs, vector<KeyPoint> keys_1, vector<KeyPoint> keys_2, string model,assist_information assist_file)
+{
+	//获取初始匹配的关键点的位置
+	vector<Point2f> point_1, point_2;
+	vector<DMatch> data_dmatchs, temp_dmatchs;
+	Mat matched_line;
+	for (size_t i = 0; i < dmatchs.size(); ++i)
+	{
+		double dis_1 = dmatchs[i][0].distance;
+		double dis_2 = dmatchs[i][1].distance;
+		if ((dis_1 / dis_2) <0.8)//如果满足距离比关系
+		{
+			data_dmatchs.push_back(dmatchs[i][0]);//保存正确的dmatchs
+			//data_dmatchs.push_back(dmatchs[i][1]);//保存正确的dmatchs
+		}
+	}
+	drawMatches(image_1, keys_1, image_2, keys_2, data_dmatchs, matched_line, Scalar(0, 255, 0), Scalar(255, 0, 0), vector<char>(), 2);
+
+	vector<assist_registration> result;
+	for (int i = 0; i < assist_file.ruler_number; ++i) {
+		//
+		assist_registration temp_reg;
+		//
+		vector<DMatch> right_matchs;
+		vector<Mat> homographys, match_line_images;
+		Mat homography, match_line_image;
+		bool flag = match(image_1, image_2, data_dmatchs, keys_1, keys_2,
+			model, right_matchs, homography, match_line_image);
+		if (!flag||right_matchs.size()<5)
+			return result;
+		//homography = homography.inv();
+ 		temp_reg.flag = flag;
+		temp_reg.homography = homography;
+		temp_reg.match_line_image = match_line_image;
+		// 点的个数
+		vector<vector<double>> temp_point;
+		for (auto i : right_matchs) {
+			vector<double> temp;
+			temp.push_back(keys_1[i.queryIdx].pt.x);
+			temp.push_back(keys_1[i.queryIdx].pt.y);
+			temp.push_back(keys_2[i.trainIdx].pt.x);
+			temp.push_back(keys_2[i.trainIdx].pt.y);
+			temp_point.push_back(temp);
+		}
+		vector<vector<double>>::iterator new_end;
+		new_end = std::unique(temp_point.begin(), temp_point.end(),
+			[](const vector<double>&a, const vector<double>&b) {
+			for (int i = 0; i < a.size(); ++i) {
+				if (abs(a[i] - b[i]) > 1)
+					return false;
+			}
+			return true; });
+		temp_point.erase(new_end, temp_point.end());
+		if (temp_point.size() < 5)
+			temp_reg.flag = false;
+		if (!temp_reg.flag)
+			return result;
+		if (temp_reg.flag) {
+			temp_reg.distance_to_left = homography.at<float>(0, 2);
+			temp_reg.points = temp_point;
+		}
+
+		// 去除误差较小的值
+		temp_dmatchs.clear();
+		Mat temp_homography = homography.inv();
+		for (int j = 0; j < data_dmatchs.size(); ++j) {
+			double x1 = keys_1[data_dmatchs[j].queryIdx].pt.x;
+			double y1 = keys_1[data_dmatchs[j].queryIdx].pt.y;
+			double x2 = keys_2[data_dmatchs[j].trainIdx].pt.x;
+			double y2 = keys_2[data_dmatchs[j].trainIdx].pt.y;
+			double rms1 = x1 * temp_homography.at<float>(0, 0) + y1 * temp_homography.at<float>(0, 1) + temp_homography.at<float>(0, 2) -x2;
+			double rms2 = x1 * temp_homography.at<float>(1, 0) + y1 * temp_homography.at<float>(1, 1) + temp_homography.at<float>(1, 2) -y2;
+			if (rms1 > 5 || rms2 > 5)
+				temp_dmatchs.push_back(data_dmatchs[j]);
+
+		}
+		dmatchs.clear();
+		data_dmatchs = temp_dmatchs;
+		
+		drawMatches(image_1, keys_1, image_2, keys_2, data_dmatchs, matched_line, Scalar(0, 255, 0), Scalar(255, 0, 0), vector<char>(), 2);
+		result.push_back(temp_reg);
+	}
+	stable_sort(result.begin(), result.end(),
+		[](assist_registration a, assist_registration b) {return a.distance_to_left < b.distance_to_left; });
+	return result;
 }
 Mat correct_image(Mat im, assist_information &assist_file)
 {

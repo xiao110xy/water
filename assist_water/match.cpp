@@ -977,3 +977,52 @@ bool match(const Mat &image_1, const Mat &image_2, const vector<vector<DMatch>> 
 
 	return true;
 }
+
+bool match(const Mat &image_1, const Mat &image_2, const vector<DMatch> &dmatchs, vector<KeyPoint> keys_1,
+	vector<KeyPoint> keys_2, string model, vector<DMatch> &right_matchs, Mat &homography, Mat &matched_line)
+{
+	//获取初始匹配的关键点的位置
+	vector<Point2f> point_1, point_2;
+	vector<DMatch> init_matchs = dmatchs;
+	for (size_t i = 0; i < dmatchs.size(); ++i)
+	{
+		point_1.push_back(keys_1[dmatchs[i].queryIdx].pt);
+		point_2.push_back(keys_2[dmatchs[i].trainIdx].pt);
+	}
+	//cout << "距离比之后初始匹配点对个数是： " << init_matchs.size() << endl;
+
+	int min_pairs = (model == string("similarity") ? 2 : (model == string("affine") ? 3 : 4));
+	if ((int)point_1.size() < min_pairs)
+		return false;
+
+	//使用ransac算法删除错误点对
+	vector<bool> inliers;
+	float rmse;
+	if (point_1.size() < 6 || point_2.size() < 6)
+		return false;
+	homography = ransac(point_1, point_2, model, ransac_error, inliers, rmse);
+	//提取出正确匹配点对
+	vector<DMatch> temp_matchs;
+	auto itt = init_matchs.begin();
+	for (auto it = inliers.begin(); it != inliers.end(); ++it, ++itt) {
+		if (*it) {
+			//如果是正确匹配点对
+			right_matchs.push_back((*itt));
+		}
+		temp_matchs.push_back((*itt));
+
+	}
+
+
+	//绘制正确匹配点对连线图
+	drawMatches(image_1, keys_1, image_2, keys_2, right_matchs,
+		matched_line, Scalar(0, 255, 0), Scalar(255, 0, 0),
+		vector<char>(), 2);
+	//Mat matched_line2;
+	//drawMatches(image_1, keys_1, image_2, keys_2, temp_matchs,
+	//	matched_line2, Scalar(0, 255, 0), Scalar(255, 0, 0),
+	//	vector<char>(), 2);
+
+
+	return true;
+}

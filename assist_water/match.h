@@ -25,5 +25,7 @@ void match_des(const Mat &des_1, const Mat &des_2, vector<vector<DMatch>> &dmatc
 /*该函数删除错误匹配点对，并进行配准*/
 bool match(const Mat &image_1, const Mat &image_2, const vector<vector<DMatch>> &dmatchs, vector<KeyPoint> keys_1,
 	vector<KeyPoint> keys_2, string model, vector<DMatch> &right_matchs, Mat &homography, Mat &matched_line);
-
+/*该函数删除错误匹配点对，并进行配准*/
+bool match(const Mat &image_1, const Mat &image_2, const vector<DMatch> &dmatchs, vector<KeyPoint> keys_1,
+	vector<KeyPoint> keys_2, string model, vector<DMatch> &right_matchs, Mat &homography, Mat &matched_line);
 #endif
