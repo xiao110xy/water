@@ -32,6 +32,7 @@ struct assist_information {
 	// 摄像头抖动
 	bool correct_flag = false;
 	vector<vector<double>> correct_point;
+	double correct_score = -1;
 	//float correct_line;
 	// 校正用点
 	vector<vector<double>> point;
@@ -77,6 +78,7 @@ float get_water_line_t2b(assist_information &assist_file);
 float match_template_score(Mat temp1, Mat temp2);
 float get_water_line(assist_information &assist_file,Mat ref_image);
 vector<float> process_score(vector<float> score, float score_t1, float score_t2);
+float get_water_line_seg(assist_information &assist_file);
 // 结果保存
 void save_file(Mat im, vector<assist_information> assist_files,map<string,string> main_ini);
 // 功能函数

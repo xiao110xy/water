@@ -113,6 +113,11 @@ bool input_assist(Mat im,map<string, string> main_ini, vector<assist_information
 					temp_assist_file.correct_point.size()>assist_files[n_water - 1].correct_point.size()) {
 					assist_files[n_water - 1] = temp_assist_file;
 			}
+			if (!assist_files[n_water - 1].correct_flag &&
+				!temp_assist_file.correct_flag&&
+				assist_files[n_water - 1].correct_score < temp_assist_file.correct_score) {
+				assist_files[n_water - 1] = temp_assist_file;
+			}
 		}
 		else {
 			continue;
@@ -174,6 +179,7 @@ int compute_water_area(Mat im, vector<assist_information> &assist_files, string 
 		base_image.convertTo(base_image, CV_64F);
 		Mat add_image = Mat::zeros(Size(base_image.cols, assist_file.add_row), CV_64F);
 		vconcat(base_image, add_image, assist_file.wrap_image);
+
 		// 获得水位线,两种方式选择
 		string temp_ref(ref_name.begin(), ref_name.end() - 4);
 		temp_ref = temp_ref + "_" + to_string(assist_file.ref_index) + string(ref_name.end() - 4, ref_name.end());
@@ -214,15 +220,52 @@ int compute_water_area(Mat im, vector<assist_information> &assist_files, string 
 				if (temp1 > 0.9 || temp2 > 0.9)
 					error_flag = true;
 			}
-			// 旋转校正 包含对原始影像进行矫正
-			Mat image_rotate = correct_image(im, assist_file);
-			assist_file.base_image = image_rotate.rowRange(0, base_image.rows).clone();
 			Mat ref_image = imread(temp_ref);// 历史参考数据
+			if (assist_file.correct_flag) {
+				// 旋转校正 包含对原始影像进行矫正
+				Mat image_rotate = correct_image(im, assist_file);
+				assist_file.base_image = image_rotate.rowRange(0, base_image.rows).clone();
+				if (isgrayscale(im))
+					assist_file.water_number = get_water_line_seg(assist_file);
+				else
+					assist_file.water_number = get_water_line(assist_file, ref_image);
+			}
+			else {
+				// 求解近似
+				Mat temp;
+				Mat assist_image = assist_file.assist_image(
+					Range(assist_file.roi[1], assist_file.roi[1] + assist_file.roi[3]),
+					Range(assist_file.roi[0], assist_file.roi[0] + assist_file.roi[2])).clone();
+				matchTemplate(im, assist_image, temp, CV_TM_CCOEFF_NORMED);
+				//  求最大score
+				int r = assist_file.roi[0], c = assist_file.roi[1];
+				float score = -2;
+				for (int i = 0; i < temp.rows; ++i)
+					for (int j = 0; j < temp.cols; ++j) {
+						if (score < temp.at<float>(i, j)) {
+							score = temp.at<float>(i, j);
+							r = i;
+							c = j;
+						}
+					}
+				// 矫正
+				vector<vector<double>> points = assist_file.point;
+				for (auto &point : points) {
+					point[2] = point[2] - assist_file.roi[0]+c;
+					point[3] = point[3] - assist_file.roi[1]+r;
+				}
+				assist_file.point = points;
+				// 旋转校正 包含对原始影像进行矫正
+				Mat image_rotate = correct_image(im, assist_file);
+				assist_file.base_image = image_rotate.rowRange(0, base_image.rows).clone();
+				if (isgrayscale(im)) {
+					assist_file.water_number = get_water_line_seg(assist_file);
+				}
+				else {
+					continue;
+				}
+			}
 
-			if (assist_file.correct_point.size()>3)
-				assist_file.water_number = get_water_line(assist_file, ref_image);
-			else
-				assist_file.water_number = get_water_line_t2b(assist_file);
 			// 判断是否为黑白错误
 			if (!assist_file.correct_flag&&error_flag)
 				continue;
@@ -314,10 +357,25 @@ bool correct_control_point(Mat im, assist_information & assist_file)
 		match_line_image = temp_assist_reg[assist_file.roi_order - 1].match_line_image;
 	}
 	else {
-		// 使用roi
+		//
+		Mat temp;
+		matchTemplate(im, assist_image, temp, CV_TM_CCOEFF_NORMED);
+		//  求最大score
+		int r = assist_file.roi[0], c = assist_file.roi[1];
+		float score = -2;
+		for (int i = 0; i < temp.rows; ++i)
+			for (int j = 0; j < temp.cols; ++j) {
+				if (score < temp.at<float>(i, j)) {
+					score = temp.at<float>(i, j);
+					r = i;
+					c = j;
+				}
+			}
+		assist_file.correct_score = score;
+		
 		// 将原始影像进行校正
-		im_temp = im(Range(assist_file.roi[1], assist_file.roi[1] + assist_file.roi[3]),
-			Range(assist_file.roi[0], assist_file.roi[0] + assist_file.roi[2])).clone();
+		im_temp = im(Range(r, r + assist_file.roi[3]),
+			Range(c, c+ assist_file.roi[2])).clone();
 		//参考图像特征点检测和描述
 		vector<vector<Mat>> gauss_pyr_3, dog_pyr_3;
 		vector<KeyPoint> keypoints_3;
@@ -338,8 +396,8 @@ bool correct_control_point(Mat im, assist_information & assist_file)
 			vector<double> temp;
 			temp.push_back(keypoints_3[i.queryIdx].pt.x);
 			temp.push_back(keypoints_3[i.queryIdx].pt.y);
-			temp[0] += assist_file.roi[0];
-			temp[1] += assist_file.roi[1];
+			temp[0] += c;
+			temp[1] += r;
 			temp.push_back(keypoints_2[i.trainIdx].pt.x);
 			temp.push_back(keypoints_2[i.trainIdx].pt.y);
 			temp_point.push_back(temp);
@@ -355,8 +413,8 @@ bool correct_control_point(Mat im, assist_information & assist_file)
 		temp_point.erase(new_end, temp_point.end());
 		if (temp_point.size() < 5)
 			return false;
-		homography.at<float>(0, 2) += assist_file.roi[0];
-		homography.at<float>(1, 2) += assist_file.roi[1];
+		homography.at<float>(0, 2) += c;
+		homography.at<float>(1, 2) += r;
 	}
 	// 矫正
 	vector<vector<double>> points = assist_file.point;
@@ -1053,6 +1111,39 @@ vector<float> process_score(vector<float> temp_score, float score_t1, float scor
 		}
 	}
 	return temp_score;
+}
+
+float get_water_line_seg(assist_information & assist_file)
+{
+	Mat temp;
+	Mat im = assist_file.base_image.clone();
+	cvtColor(im, im, CV_BGR2GRAY);
+	threshold(im, temp, 0, 255, CV_THRESH_BINARY | CV_THRESH_OTSU);
+	vector<double> im_score(im.rows, 0);
+	for (int i = 0; i < im.rows; ++i) {
+		int n = 0;
+		for (int j = 0; j < im.cols; ++j) {
+			if (temp.at<uchar>(i, j) > 100)
+				++n;
+		}
+		im_score[i] = n;
+	}
+	int water_line = 0;
+	int n_threshold = im.cols*0.4;
+	int n_length = (double)assist_file.base_image.rows / assist_file.length;
+	for (int i = n_length-1; i < im_score.size(); ++i) {
+		double score = 0;
+		for (int j = i - n_length + 1; j <= i; ++j) {
+			if (im_score[j] > n_threshold) {
+				++score;
+			}
+		}
+		score = score / n_length;
+		if (score > 0.9)
+			water_line = i;
+	}
+	float water_number = (1 - (water_line + 1) / (double)assist_file.base_image.rows)*assist_file.length;
+	return water_number;
 }
 
 void save_file(Mat im, vector<assist_information> assist_files, map<string, string> main_ini)
