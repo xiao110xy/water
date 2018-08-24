@@ -31,8 +31,9 @@ struct assist_information {
 	int roi_order = 1;
 	// 摄像头抖动
 	bool correct_flag = false;
-	vector<vector<double>> correct_point;
+	bool match_flag = false;
 	double correct_score = -1;
+	vector<vector<double>> correct_point;
 	//float correct_line;
 	// 校正用点
 	vector<vector<double>> point;
@@ -65,6 +66,7 @@ bool isgrayscale(Mat im);
 bool correct_control_point(Mat im, assist_information &assist_file);
 vector<assist_registration> xy_match(const Mat &image_1, const Mat &image_2, vector<vector<DMatch>> &dmatchs, vector<KeyPoint> keys_1,
 	vector<KeyPoint> keys_2, string model,assist_information  assist_file);
+Mat cluster_score_image(Mat score_image, float score_t, Point point, int number);
 // 几何校正原始影像
 Mat correct_image(Mat im, assist_information &assist_file);
 void map_coord(assist_information &assist_file, Mat &map_x, Mat &map_y);
@@ -77,8 +79,9 @@ bool get_label_mask(Mat mask,int &label, Mat &label_mask, assist_information ass
 float get_water_line_t2b(assist_information &assist_file);
 float match_template_score(Mat temp1, Mat temp2);
 float get_water_line(assist_information &assist_file,Mat ref_image);
+float optimization_water_line(assist_information &assist_file, float water_line);
 vector<float> process_score(vector<float> score, float score_t1, float score_t2);
-float get_water_line_seg(assist_information &assist_file);
+float get_water_line_seg(assist_information &assist_file,Mat ref_image);
 // 结果保存
 void save_file(Mat im, vector<assist_information> assist_files,map<string,string> main_ini);
 // 功能函数
