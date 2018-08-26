@@ -18,6 +18,12 @@ struct assist_registration {
 	vector<vector<double>> points;
 	bool flag;
 };
+struct xy_feature {
+	int x;
+	int y;
+	double dx;
+	double dy;
+};
 struct assist_information {
 	// 基本信息
 	Mat base_image;
@@ -66,22 +72,25 @@ bool isgrayscale(Mat im);
 bool correct_control_point(Mat im, assist_information &assist_file);
 vector<assist_registration> xy_match(const Mat &image_1, const Mat &image_2, vector<vector<DMatch>> &dmatchs, vector<KeyPoint> keys_1,
 	vector<KeyPoint> keys_2, string model,assist_information  assist_file);
+Mat edge_match(Mat im1, Mat im2);
+Mat GetImageEdge(Mat im, Mat &result);
+vector<xy_feature> CalGradientFeatures(Mat im, vector<Point> points);
 Mat cluster_score_image(Mat score_image, float score_t, Point point, int number);
 // 几何校正原始影像
 Mat correct_image(Mat im, assist_information &assist_file);
-void map_coord(assist_information &assist_file, Mat &map_x, Mat &map_y);
+void map_coord(assist_information &assist_file,Mat &map_x, Mat &map_y,int base_x = 0, int base_y = 0);
 Mat GeoCorrect2Poly(assist_information assist_file,bool flag);
 Mat compute_point(Mat point, Mat r);
 double compute_rms(Mat base_point, Mat wrap_point, Mat r);
 // 水位线识别
 void get_water_line(assist_information &assist_file);//从上到下
-bool get_label_mask(Mat mask,int &label, Mat &label_mask, assist_information assist_file,int y_t);
-float get_water_line_t2b(assist_information &assist_file);
+bool get_label_mask(Mat mask,int &label, Mat &label_mask, double,int y_t);
+float get_water_line_t2b(Mat im, double length,Mat& segment_result);
 float match_template_score(Mat temp1, Mat temp2);
-float get_water_line(assist_information &assist_file,Mat ref_image);
-float optimization_water_line(assist_information &assist_file, float water_line);
+float get_water_line(Mat im, Mat ref_image, double length);
+float optimization_water_line(assist_information &assist_file, float water_line, double m_SigmaS, double m_SigmaR);
 vector<float> process_score(vector<float> score, float score_t1, float score_t2);
-float get_water_line_seg(assist_information &assist_file,Mat ref_image);
+float get_water_line_seg(Mat im,Mat ref_image,double length);
 // 结果保存
 void save_file(Mat im, vector<assist_information> assist_files,map<string,string> main_ini);
 // 功能函数

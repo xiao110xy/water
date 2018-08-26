@@ -245,8 +245,12 @@ Mat ransac(const vector<Point2f> &points_1, const vector<Point2f> &points_2, str
 	for (size_t i = 0; i < iterations;++i)
 	{
 		//随机选择n个不同的点对
+		int n_num = 0;
 		while (1)
 		{
+			++n_num;
+			if (n_num > 1000)
+				return Mat();
 			randu(rand_mat, 0, N-1);//随机生成n个范围在[0,N-1]之间的数
 
 			//保证这n个点坐标不相同
@@ -1001,6 +1005,8 @@ bool match(const Mat &image_1, const Mat &image_2, const vector<DMatch> &dmatchs
 	if (point_1.size() < 6 || point_2.size() < 6)
 		return false;
 	homography = ransac(point_1, point_2, model, ransac_error, inliers, rmse);
+	if (!homography.data)
+		return false;
 	//提取出正确匹配点对
 	vector<DMatch> temp_matchs;
 	auto itt = init_matchs.begin();
