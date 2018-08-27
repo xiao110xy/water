@@ -1633,8 +1633,8 @@ void save_file(Mat im, vector<assist_information> assist_files, map<string, stri
 			break;
 		}		
 	}
-	if (n ==0)
-		cache_name = "temp_" + cache_name;
+	if (n == 0)
+		cache_name = "temp_" + temp;
 	else {
 		cache_name = temp;
 		temp = "temp_";
@@ -1642,16 +1642,17 @@ void save_file(Mat im, vector<assist_information> assist_files, map<string, stri
 	}
 	ofstream file_cache(cache_name);
 	for (int i = 0; i < assist_files.size(); ++i) {
-		file_cache << fixed << (int)assist_files[i].roi[0]<<",";
-		file_cache << fixed << (int)assist_files[i].roi[1]<<",";
-		file_cache << fixed << (int)assist_files[i].roi[2]<<",";
+		file_cache << "0,0,0,0,0," << (int)assist_files[i].point.size() << endl;
+		file_cache << fixed << (int)assist_files[i].roi[0] << ",";
+		file_cache << fixed << (int)assist_files[i].roi[1] << ",";
+		file_cache << fixed << (int)assist_files[i].roi[2] << ",";
 		file_cache << fixed << (int)assist_files[i].roi[3] << ";" << endl;
 		for (int j = 0; j < assist_files[i].point.size(); ++j) {
 			for (int k = 0; k < assist_files[i].point[j].size(); ++k) {
-				file_cache << fixed << setprecision(2) <<(assist_files[i].point[j])[k];
+				file_cache << fixed << setprecision(2) << (assist_files[i].point[j])[k];
 				if (k != 3)
-					file_cache << "," ;
-				else 
+					file_cache << ",";
+				else
 					file_cache << ";" << endl;
 			}
 		}

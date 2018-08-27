@@ -364,22 +364,31 @@ bool correct_control_point(Mat im, assist_information & assist_file)
 			Range(assist_file.roi[1], assist_file.roi[1] + int(0.2*assist_file.roi[3])),
 			Range(assist_file.roi[0], assist_file.roi[0] + assist_file.roi[2])
 		).clone();
-		//temp = edge_match(temp_im, assist_image);
 		if (isgrayscale(assist_image)^ isgrayscale(temp_im)) {
 			return false;
 		}
-		matchTemplate(temp_im, assist_image, temp, CV_TM_CCOEFF_NORMED);
-		//  求最大score
-		int temp_r =0, temp_c =0;
 		float score = -2;
-		for (int j = 0; j < temp.rows; ++j)
-			for (int k = 0; k < temp.cols; ++k) {
-				if (score < temp.at<float>(j, k)) {
-					score = temp.at<float>(j, k);
-					temp_r = j;
-					temp_c = k;
+		int temp_r =0, temp_c =0;
+		if (isgrayscale(temp_im)) {
+			matchTemplate(temp_im, assist_image, temp, CV_TM_CCOEFF_NORMED);
+			//求最大score
+			for (int j = 0; j < temp.rows; ++j)
+				for (int k = 0; k < temp.cols; ++k) {
+					if (score < temp.at<float>(j, k)) {
+						score = temp.at<float>(j, k);
+						temp_r = j;
+						temp_c = k;
+					}
 				}
-			}
+		}
+		else {
+			Point result;
+			Mat draw_image;
+			bool flag = geo_match(temp_im, assist_image, score, draw_image, result);
+			temp_r = result.y;
+			temp_c = result.x;
+		}
+
 		// 将原始影像进行校正
 		Mat assist_image_temp = im(
 			Range(temp_r, temp_r + int(0.2*assist_file.roi[3])),
@@ -481,9 +490,11 @@ vector<assist_registration> xy_match(const Mat & image_1, const Mat & image_2,  
 		vector<vector<double>> temp_points;
 		for (int i = 0; i < temp_point.size()-1; ++i) {
 			bool flag = true;
-			for (int j = i; j < temp_point.size(); ++j)
-				for (int k = 0; k < temp_point[j].size();++k) {
-					if (abs((temp_point[i])[k] - (temp_point[j])[k]) < 2)
+			for (int j = 0; j < temp_points.size(); ++j)
+				for (int k = 0; k < temp_point[j].size();k=k+2) {
+					double temp1 = abs((temp_point[i])[k] - (temp_points[j])[k]);
+					double temp2 = abs((temp_point[i])[k+1] - (temp_points[j])[k+1]);
+					if((temp1<1)&&(temp2<1))
 						flag = false;
 				}
 			if (flag)
@@ -522,6 +533,29 @@ vector<assist_registration> xy_match(const Mat & image_1, const Mat & image_2,  
 		[](assist_registration a, assist_registration b) {return a.distance_to_left < b.distance_to_left; });
 	return result;
 }
+Mat xy_hog_Match(Mat im1, Mat im2)
+{
+	int cellsize = 4;
+	HOGDescriptor hog(Size(64, 64), Size(16, 16), Size(8, 8), Size(8, 8), 3);
+	vector<float> descriptors;//HOG描述子向量
+	hog.compute(im2, descriptors, Size(8, 8));
+	Mat hog_1 = Mat(descriptors.size(), 1, CV_32FC1);
+	Mat hog_2 = Mat(descriptors.size(), 1, CV_32FC1);
+	memcpy(hog_2.data, descriptors.data(), descriptors.size() * sizeof(float));
+	Mat score1 = Mat::zeros(Size(im1.cols / 8 + 64, im2.rows / 8 + 64), CV_32FC1);
+	Mat temp_score;
+	vector<Point> temp_point;
+	for (int i=0;i<(im1.rows-im2.rows)/8;++i)
+		for (int j = 0; j < (im1.cols - im2.cols)/8; ++j) {
+			Mat temp = im1(Range(i, i + im2.rows),Range(j, j + im2.cols)).clone();
+			hog.compute(temp, descriptors, Size(2, 2));
+			memcpy(hog_1.data, descriptors.data(), descriptors.size() * sizeof(float));
+			matchTemplate(hog_1, hog_2, temp_score, CV_TM_CCOEFF_NORMED);
+			score1.at<float>(i, j) = temp_score.at<float>(0, 0);
+		}
+
+	return Mat();
+}
 Mat edge_match(Mat im1, Mat im2)
 {
 	cvtColor(im1, im1, CV_BGR2GRAY);
@@ -535,30 +569,36 @@ Mat edge_match(Mat im1, Mat im2)
 	vector<Point> points;
 	Point max_x_index(0,0), max_y_index(0, 0);
 	for (int i = 0; i < pre_contours.size(); ++i) {
-		int max_x=0, max_y = 0;
-		int min_x= template_im.total(), min_y = template_im.total();
-		for (int j = 0; j < pre_contours[i].size(); ++j) {
-			Point temp = (pre_contours[i])[j];
-			max_x = max_x > temp.x ? max_x : temp.x;
-			min_x = min_x < temp.x ? min_x : temp.x;
-			max_y = max_y > temp.y ? max_y : temp.y;
-			min_y = min_y < temp.y ? min_y : temp.y;
-		}
-		if (max_x - min_x > max_x_index.x) {
-			max_x_index.x = max_x - min_x;
-			max_x_index.y = i;
-		}
-		if (max_y - min_y > max_y_index.x) {
-			max_y_index.x = max_y - min_y;
-			max_y_index.y = i;
-		}
+		if (pre_contours[i].size() < im2.cols)
+			continue;
+		else
+			points.insert(points.end(), pre_contours[i].begin(), pre_contours[i].end());
 	}
-	if (max_x_index.y == max_y_index.y)
-		points = pre_contours[max_x_index.y];
-	else {
-		points = pre_contours[max_x_index.y];
-		points.insert(points.end(),pre_contours[max_y_index.y].begin(), pre_contours[max_y_index.y].end());
-	}
+	//for (int i = 0; i < pre_contours.size(); ++i) {
+	//	int max_x=0, max_y = 0;
+	//	int min_x= template_im.total(), min_y = template_im.total();
+	//	for (int j = 0; j < pre_contours[i].size(); ++j) {
+	//		Point temp = (pre_contours[i])[j];
+	//		max_x = max_x > temp.x ? max_x : temp.x;
+	//		min_x = min_x < temp.x ? min_x : temp.x;
+	//		max_y = max_y > temp.y ? max_y : temp.y;
+	//		min_y = min_y < temp.y ? min_y : temp.y;
+	//	}
+	//	if (max_x - min_x > max_x_index.x) {
+	//		max_x_index.x = max_x - min_x;
+	//		max_x_index.y = i;
+	//	}
+	//	if (max_y - min_y > max_y_index.x) {
+	//		max_y_index.x = max_y - min_y;
+	//		max_y_index.y = i;
+	//	}
+	//}
+	//if (max_x_index.y == max_y_index.y)
+	//	points = pre_contours[max_x_index.y];
+	//else {
+	//	points = pre_contours[max_x_index.y];
+	//	points.insert(points.end(),pre_contours[max_y_index.y].begin(), pre_contours[max_y_index.y].end());
+	//}
 	if (points.size() > 1000) {
 		int step = points.size() / 500;
 		vector< Point> temp;
@@ -1633,8 +1673,8 @@ void save_file(Mat im, vector<assist_information> assist_files, map<string, stri
 			break;
 		}		
 	}
-	if (n ==0)
-		cache_name = "temp_" + cache_name;
+	if (n == 0)
+		cache_name = "temp_" + temp;
 	else {
 		cache_name = temp;
 		temp = "temp_";
@@ -1642,16 +1682,17 @@ void save_file(Mat im, vector<assist_information> assist_files, map<string, stri
 	}
 	ofstream file_cache(cache_name);
 	for (int i = 0; i < assist_files.size(); ++i) {
-		file_cache << fixed << (int)assist_files[i].roi[0]<<",";
-		file_cache << fixed << (int)assist_files[i].roi[1]<<",";
-		file_cache << fixed << (int)assist_files[i].roi[2]<<",";
+		file_cache << "0,0,0,0,0," << (int)assist_files[i].point.size() << endl;
+		file_cache << fixed << (int)assist_files[i].roi[0] << ",";
+		file_cache << fixed << (int)assist_files[i].roi[1] << ",";
+		file_cache << fixed << (int)assist_files[i].roi[2] << ",";
 		file_cache << fixed << (int)assist_files[i].roi[3] << ";" << endl;
 		for (int j = 0; j < assist_files[i].point.size(); ++j) {
 			for (int k = 0; k < assist_files[i].point[j].size(); ++k) {
-				file_cache << fixed << setprecision(2) <<(assist_files[i].point[j])[k];
+				file_cache << fixed << setprecision(2) << (assist_files[i].point[j])[k];
 				if (k != 3)
-					file_cache << "," ;
-				else 
+					file_cache << ",";
+				else
 					file_cache << ";" << endl;
 			}
 		}

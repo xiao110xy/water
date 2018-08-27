@@ -186,6 +186,7 @@
     <ClInclude Include="BgEdgeDetect.h" />
     <ClInclude Include="BgEdgeList.h" />
     <ClInclude Include="BgImage.h" />
+    <ClInclude Include="GeoMatch.h" />
     <ClInclude Include="match.h" />
     <ClInclude Include="MeanShiftSegmentor.h" />
     <ClInclude Include="ms.h" />
@@ -208,6 +209,7 @@
     <ClCompile Include="BgEdgeList.cpp" />
     <ClCompile Include="BgGlobalFc.cpp" />
     <ClCompile Include="BgImage.cpp" />
+    <ClCompile Include="GeoMatch.cpp" />
     <ClCompile Include="match.cpp" />
     <ClCompile Include="MeanShiftSegmentor.cpp" />
     <ClCompile Include="ms.cpp" />

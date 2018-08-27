@@ -11,6 +11,7 @@
 #include"sift.h"
 #include"match.h"
 #include "MeanShiftSegmentor.h"
+#include "GeoMatch.h"
 struct assist_registration {
 	int distance_to_left=9999;
 	Mat match_line_image;
@@ -72,6 +73,7 @@ bool isgrayscale(Mat im);
 bool correct_control_point(Mat im, assist_information &assist_file);
 vector<assist_registration> xy_match(const Mat &image_1, const Mat &image_2, vector<vector<DMatch>> &dmatchs, vector<KeyPoint> keys_1,
 	vector<KeyPoint> keys_2, string model,assist_information  assist_file);
+Mat xy_hog_Match(Mat im1, Mat im2);
 Mat edge_match(Mat im1, Mat im2);
 Mat GetImageEdge(Mat im, Mat &result);
 vector<xy_feature> CalGradientFeatures(Mat im, vector<Point> points);
