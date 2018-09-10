@@ -11,6 +11,9 @@
 #include"sift.h"
 #include"match.h"
 #include "MeanShiftSegmentor.h"
+#include "GeoMatch.h"
+#include "retinex.h"
+#define match_t 0.5
 struct assist_registration {
 	int distance_to_left=9999;
 	Mat match_line_image;
@@ -31,13 +34,16 @@ struct assist_information {
 	int length;
 	int add_row;
 	int ruler_number=1;
+	// 用于配准
+	vector<KeyPoint> keypoints;
+	Mat descriptors;
 	// roi 
 	Mat assist_image;
 	vector<double> roi;
+	vector<double> sub_roi;
 	int roi_order = 1;
 	// 摄像头抖动
 	bool correct_flag = false;
-	bool match_flag = false;
 	double correct_score = -1;
 	vector<vector<double>> correct_point;
 	//float correct_line;
@@ -65,17 +71,16 @@ bool input_assist(Mat im,map<string, string> main_ini, vector<assist_information
 bool get_number(string line_string, vector<double> &temp);
 bool input_assist_image(string file_name,assist_information &assist_file);
 // 处理主函数
-int compute_water_area(Mat im, vector<assist_information> &assist_files,string ref_name);
+void compute_water_area(Mat im, vector<assist_information> &assist_files,string ref_name);
 // 判断是白天还是黑夜
 bool isgrayscale(Mat im);
 // 对原始影像进行配准
 bool correct_control_point(Mat im, assist_information &assist_file);
 vector<assist_registration> xy_match(const Mat &image_1, const Mat &image_2, vector<vector<DMatch>> &dmatchs, vector<KeyPoint> keys_1,
 	vector<KeyPoint> keys_2, string model,assist_information  assist_file);
-Mat edge_match(Mat im1, Mat im2);
-Mat GetImageEdge(Mat im, Mat &result);
-vector<xy_feature> CalGradientFeatures(Mat im, vector<Point> points);
-Mat cluster_score_image(Mat score_image, float score_t, Point point, int number);
+
+void GetImageThreshold(Mat im, int &bestLowThresh, int& bestHighThresh);
+
 // 几何校正原始影像
 Mat correct_image(Mat im, assist_information &assist_file);
 void map_coord(assist_information &assist_file,Mat &map_x, Mat &map_y,int base_x = 0, int base_y = 0);

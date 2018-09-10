@@ -194,6 +194,7 @@
     <ClInclude Include="msSys.h" />
     <ClInclude Include="RAList.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="retinex.h" />
     <ClInclude Include="rlist.h" />
     <ClInclude Include="sift.h" />
     <ClInclude Include="stdafx.h" />
@@ -216,6 +217,7 @@
     <ClCompile Include="msImageProcessor.cpp" />
     <ClCompile Include="msSys.cpp" />
     <ClCompile Include="RAList.cpp" />
+    <ClCompile Include="retinex.cpp" />
     <ClCompile Include="rlist.cpp" />
     <ClCompile Include="sift.cpp" />
     <ClCompile Include="stdafx.cpp">

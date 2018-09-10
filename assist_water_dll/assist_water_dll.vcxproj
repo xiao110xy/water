@@ -25,12 +25,14 @@
     <ClCompile Include="BgEdgeList.cpp" />
     <ClCompile Include="BgGlobalFc.cpp" />
     <ClCompile Include="BgImage.cpp" />
+    <ClCompile Include="GeoMatch.cpp" />
     <ClCompile Include="match.cpp" />
     <ClCompile Include="MeanShiftSegmentor.cpp" />
     <ClCompile Include="ms.cpp" />
     <ClCompile Include="msImageProcessor.cpp" />
     <ClCompile Include="msSys.cpp" />
     <ClCompile Include="RAList.cpp" />
+    <ClCompile Include="retinex.cpp" />
     <ClCompile Include="rlist.cpp" />
     <ClCompile Include="sift.cpp" />
     <ClCompile Include="stdafx.cpp">
@@ -48,6 +50,7 @@
     <ClInclude Include="BgEdgeDetect.h" />
     <ClInclude Include="BgEdgeList.h" />
     <ClInclude Include="BgImage.h" />
+    <ClInclude Include="GeoMatch.h" />
     <ClInclude Include="match.h" />
     <ClInclude Include="MeanShiftSegmentor.h" />
     <ClInclude Include="ms.h" />
@@ -55,6 +58,7 @@
     <ClInclude Include="msSys.h" />
     <ClInclude Include="RAList.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="retinex.h" />
     <ClInclude Include="rlist.h" />
     <ClInclude Include="sift.h" />
     <ClInclude Include="stdafx.h" />
