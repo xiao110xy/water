@@ -166,18 +166,24 @@
       </SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
+      <AssemblerOutput>All</AssemblerOutput>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <StackReserveSize>10000000000</StackReserveSize>
-      <GenerateMapFile>false</GenerateMapFile>
+      <StackReserveSize>
+      </StackReserveSize>
+      <GenerateMapFile>
+      </GenerateMapFile>
       <MapFileName>
       </MapFileName>
       <MapExports>
       </MapExports>
+      <AssemblyDebug>
+      </AssemblyDebug>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -186,6 +192,7 @@
     <ClInclude Include="BgEdgeDetect.h" />
     <ClInclude Include="BgEdgeList.h" />
     <ClInclude Include="BgImage.h" />
+    <ClInclude Include="dehazing.h" />
     <ClInclude Include="GeoMatch.h" />
     <ClInclude Include="match.h" />
     <ClInclude Include="MeanShiftSegmentor.h" />
@@ -210,6 +217,7 @@
     <ClCompile Include="BgEdgeList.cpp" />
     <ClCompile Include="BgGlobalFc.cpp" />
     <ClCompile Include="BgImage.cpp" />
+    <ClCompile Include="dehazing.cpp" />
     <ClCompile Include="GeoMatch.cpp" />
     <ClCompile Include="match.cpp" />
     <ClCompile Include="MeanShiftSegmentor.cpp" />

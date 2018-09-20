@@ -106,12 +106,14 @@ float match_template_score(Mat temp1, Mat temp2);
 vector<float> process_score(vector<float> score, float score_t1, float score_t2);
 
 // 白天水位线
-float get_water_line_day( assist_information &assist_file);
+float get_water_line_day(Mat gc_im, assist_information &assist_file, int water_line);
 int get_mask_line(Mat mask,int n_length);
 int get_water_line(assist_information &assist_file);
 Mat getBinMaskByMask(Mat mask);
 int get_best_line(Mat mask, int x, int y);
-float optimization_water_line(Mat im, float water_line, double m_SigmaS, double m_SigmaR);
+Mat guidedFilter(Mat srcImage, Mat &guideImage, int radius, double eps);
+Mat color_tansform(Mat data, Mat ref_image);
+int optimization_water_line(assist_information &assist_file, float water_line, double m_SigmaS, double m_SigmaR);
 // 夜晚水位线
 float get_water_line_night(assist_information &assist_file);
 bool left_right_water(Mat gc_im,int length);
@@ -136,3 +138,5 @@ vector<vector<Point3f>> new_point_line1_line2(Mat dx, Mat dy, vector<Point3f> po
 vector<vector<vector<Point3f>>> select_point_line(vector<vector<vector<Point3f>>> &left_e, vector<vector<vector<Point3f>>> &right_e);
 vector<Point3f> localmax_point_score(Mat score_image, int x1, int x2, float d_t, float scale);
 vector<Point> get_line_point(Point2f point1, Point2f point2);
+
+
