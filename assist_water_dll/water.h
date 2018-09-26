@@ -32,7 +32,6 @@ struct assist_information {
 	Mat base_image;
 	Mat wrap_image;
 	int length;
-	int add_row;
 	int ruler_number=1;
 	// 用于配准
 	vector<KeyPoint> keypoints;
@@ -54,8 +53,14 @@ struct assist_information {
 	double rms_1, rms_2;
 	//ref
 	int ref_index;
+	Mat ref_image;
 	// 分割水位线
 	Mat segment_result;
+	Mat left_image;
+	Mat right_image;
+	Mat expand_wrap_image;
+	vector<float> scores1;
+	vector<float> scores2;
 	vector<Point2d> parrallel_lines;
 	vector<Point2d> parrallel_left;
 	vector<Point2d> parrallel_right;
@@ -74,6 +79,14 @@ bool input_assist_image(string file_name,assist_information &assist_file);
 void compute_water_area(Mat im, vector<assist_information> &assist_files,string ref_name);
 // 判断是白天还是黑夜
 bool isgrayscale(Mat im);
+// 判断是否是纯黑
+bool isblack(Mat im, assist_information assist_file);
+// 判断是否全是水
+bool isblank(Mat im, assist_information &assist_file);
+// 判断是否已经是底部了，白天；判断左右是否有水，晚上；
+bool notall(Mat im, assist_information &assist_file);
+// 判断water_line 是否可信
+bool water_line_isok(int water_line, int all_length, int n_length);
 // 对原始影像进行配准
 bool correct_control_point(Mat im, assist_information &assist_file);
 vector<assist_registration> xy_match(const Mat &image_1, const Mat &image_2, vector<vector<DMatch>> &dmatchs, vector<KeyPoint> keys_1,
@@ -88,14 +101,24 @@ Mat GeoCorrect2Poly(assist_information assist_file,bool flag);
 Mat compute_point(Mat point, Mat r);
 double compute_rms(Mat base_point, Mat wrap_point, Mat r);
 // 水位线识别
-void get_water_line(assist_information &assist_file);//从上到下
 bool get_label_mask(Mat mask,int &label, Mat &label_mask, double,int y_t);
 float get_water_line_t2b(Mat im, double length,Mat& segment_result);
 float match_template_score(Mat temp1, Mat temp2);
-float get_water_line(Mat im, Mat ref_image, double length);
-float optimization_water_line(assist_information &assist_file, float water_line, double m_SigmaS, double m_SigmaR);
 vector<float> process_score(vector<float> score, float score_t1, float score_t2);
-float get_water_line_seg(Mat im,Mat ref_image,double length);
+
+// 白天水位线
+float get_water_line_day(Mat gc_im, assist_information &assist_file, int water_line);
+int get_mask_line(Mat mask,int n_length);
+int get_water_line(assist_information &assist_file);
+Mat getBinMaskByMask(Mat mask);
+int get_best_line(Mat mask, int x, int y);
+Mat guidedFilter(Mat srcImage, Mat &guideImage, int radius, double eps);
+Mat color_tansform(Mat data, Mat ref_image);
+int optimization_water_line(assist_information &assist_file, float water_line, double m_SigmaS, double m_SigmaR);
+// 夜晚水位线
+float get_water_line_night(assist_information &assist_file);
+bool left_right_water(Mat gc_im,int length);
+int get_water_line_seg(Mat im, int length);
 // 结果保存
 void save_file(Mat im, vector<assist_information> assist_files,map<string,string> main_ini);
 // 功能函数
@@ -116,3 +139,5 @@ vector<vector<Point3f>> new_point_line1_line2(Mat dx, Mat dy, vector<Point3f> po
 vector<vector<vector<Point3f>>> select_point_line(vector<vector<vector<Point3f>>> &left_e, vector<vector<vector<Point3f>>> &right_e);
 vector<Point3f> localmax_point_score(Mat score_image, int x1, int x2, float d_t, float scale);
 vector<Point> get_line_point(Point2f point1, Point2f point2);
+
+

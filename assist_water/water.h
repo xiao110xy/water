@@ -85,7 +85,8 @@ bool isblack(Mat im, assist_information assist_file);
 bool isblank(Mat im, assist_information &assist_file);
 // 判断是否已经是底部了，白天；判断左右是否有水，晚上；
 bool notall(Mat im, assist_information &assist_file);
-
+// 判断water_line 是否可信
+bool water_line_isok(int water_line, int all_length, int n_length);
 // 对原始影像进行配准
 bool correct_control_point(Mat im, assist_information &assist_file);
 vector<assist_registration> xy_match(const Mat &image_1, const Mat &image_2, vector<vector<DMatch>> &dmatchs, vector<KeyPoint> keys_1,

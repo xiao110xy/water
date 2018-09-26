@@ -204,7 +204,7 @@ void compute_water_area(Mat im, vector<assist_information> &assist_files, string
 			add_row + assist_file.base_image.rows), CV_64F);
 		Mat image_rotate = correct_image(im, assist_file);
 		assist_file.base_image = image_rotate.rowRange(0, assist_file.base_image.rows).clone();
-		// 判断是否为无图像区域
+		//判断是否为无图像区域
 		if (isblack(im, assist_file)) {
 			assist_file.parrallel_left.clear();
 			assist_file.parrallel_right.clear();
@@ -225,34 +225,60 @@ void compute_water_area(Mat im, vector<assist_information> &assist_files, string
 		temp_ref = temp_ref + "_" + to_string(assist_file.ref_index) + string(ref_name.end() - 4, ref_name.end());
 		fstream _file; 
 		_file.open(temp_ref, ios::in);
+		double water_line = -1;
 		if (!_file) {
-			continue;
+			water_line = get_water_line_seg(assist_file.base_image, assist_file.length);
+			//continue;
 		}
 		else {
 			assist_file.ref_image = imread(temp_ref);// 历史参考数据
-			double water_line = -1;
+			
 			if (!isgrayscale(im)) {
 				water_line = get_water_line(assist_file);
 				int n_length = 7.0*assist_file.base_image.rows/assist_file.length;
 				Mat gc_im = assist_file.expand_wrap_image.clone();
 				if (water_line < n_length) {
-					water_line = get_water_line_day(gc_im, assist_file, water_line);
+					water_line = get_water_line_day(gc_im, assist_file, assist_file.base_image.rows-n_length);
+					if (water_line < 0)
+						continue;
+					if (!water_line_isok(water_line, assist_file.base_image.rows, n_length)) {
+						water_line = get_water_line_day(gc_im, assist_file, water_line/2);
+					}
 				}
 				else {
 					Mat gc_im_hsv;
 					retinex_process(gc_im, gc_im_hsv);
 					int water_line1 = get_water_line_day(gc_im, assist_file, water_line);
 					int water_line2 = get_water_line_day(gc_im_hsv, assist_file, water_line);
-					if (abs(water_line - water_line1) < abs(water_line - water_line2)) {
-						water_line = water_line1;
+					if (water_line_isok(water_line1, gc_im.rows, n_length)) {
+						if (water_line_isok(water_line2, gc_im.rows, n_length)) {
+							// 都对
+							if (water_line1 > water_line2) {
+								water_line = water_line1;
+							}
+							else {
+								if (abs(water_line - water_line1) < abs(water_line - water_line2)) {
+									water_line = water_line1;
+								}
+								else {
+									water_line = water_line2;
+								}
+							}
+						}
+						else {
+							water_line = water_line1;
+						}
 					}
 					else {
-						water_line = water_line2;
+						if (water_line_isok(water_line2, gc_im.rows, n_length)) {
+							water_line = water_line2;
+						}
+						else {
+							// 维持现有
+						}
 					}
+
 				}
-				
-				
-				
 			}
 			else {
 				water_line = get_water_line_night(assist_file);
@@ -263,21 +289,19 @@ void compute_water_area(Mat im, vector<assist_information> &assist_files, string
 				assist_file.parrallel_lines.clear();
 				continue;
 			}
-
-			assist_file.water_number = (assist_file.base_image.rows-water_line-1) / assist_file.base_image.rows*assist_file.length;
-			Mat water_line_point = Mat::zeros(Size(2, 2), CV_64F);
-			water_line_point.at<double>(0, 0) = 0;
-			water_line_point.at<double>(0, 1) = water_line;
-			water_line_point.at<double>(1, 0) = assist_file.base_image.cols- 1;
-			water_line_point.at<double>(1, 1) = water_line;
-			water_line_point = compute_point(water_line_point, assist_file.r);
-			assist_file.water_lines.clear();
-			assist_file.water_lines.push_back(water_line_point.at<double>(0, 0));
-			assist_file.water_lines.push_back(water_line_point.at<double>(0, 1));
-			assist_file.water_lines.push_back(water_line_point.at<double>(1, 0));
-			assist_file.water_lines.push_back(water_line_point.at<double>(1, 1));
-			
 		}
+		assist_file.water_number = (assist_file.base_image.rows - water_line - 1) / assist_file.base_image.rows*assist_file.length;
+		Mat water_line_point = Mat::zeros(Size(2, 2), CV_64F);
+		water_line_point.at<double>(0, 0) = 0;
+		water_line_point.at<double>(0, 1) = water_line;
+		water_line_point.at<double>(1, 0) = assist_file.base_image.cols - 1;
+		water_line_point.at<double>(1, 1) = water_line;
+		water_line_point = compute_point(water_line_point, assist_file.r);
+		assist_file.water_lines.clear();
+		assist_file.water_lines.push_back(water_line_point.at<double>(0, 0));
+		assist_file.water_lines.push_back(water_line_point.at<double>(0, 1));
+		assist_file.water_lines.push_back(water_line_point.at<double>(1, 0));
+		assist_file.water_lines.push_back(water_line_point.at<double>(1, 1));
 		_file.close();
 
 	}
@@ -450,6 +474,15 @@ bool notall(Mat im, assist_information &assist_file)
 			flag = true;
 	}
 	return flag;
+}
+
+bool water_line_isok(int water_line, int all_length, int n_length)
+{
+	if (water_line<0)
+		return false;
+	if (water_line > all_length - n_length)
+		return false;
+	return true;
 }
 
 bool correct_control_point(Mat im, assist_information & assist_file)
@@ -650,7 +683,7 @@ vector<assist_registration> xy_match(const Mat & image_1, const Mat & image_2,  
 				for (int k = 0; k < temp_point[j].size();k=k+2) {
 					double temp1 = abs((temp_point[i])[k] - (temp_points[j])[k]);
 					double temp2 = abs((temp_point[i])[k+1] - (temp_points[j])[k+1]);
-					if((temp1<1)&&(temp2<1))
+					if((temp1<10)&&(temp2<10))
 						flag = false;
 				}
 			if (flag)
@@ -1197,10 +1230,12 @@ float get_water_line_day(Mat gc_im,assist_information &assist_file,int water_lin
 		temp_water_line1 = get_mask_line(mask, n_length);
 		if (temp_water_line1 < 5)
 			return -1;
+		//mask.colRange(c*1.7, c * 3.3).setTo(2);
 		mask(Range(0, temp_water_line1), Range(2*c, c * 3)).setTo(3);
+		mask(Range(temp_water_line1,mask.rows ), Range(2*c, c * 3)).setTo(2);
 		grabCut(gc_im, mask, Rect(), aBgd, aFgd, 1, cv::GC_INIT_WITH_MASK);
 		temp_water_line2 = get_mask_line(mask, n_length);
-		if (abs(temp_water_line1 - temp_water_line2) < 5)
+		if (abs(temp_water_line1 - temp_water_line2) < 15)
 			break;
 
 	}

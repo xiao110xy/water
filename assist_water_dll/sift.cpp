@@ -40,7 +40,7 @@ void MySift::create_initial_image(const Mat &image, Mat &init_image) const
 	//转换换为灰度图像
 	Mat gray_image;
 	if (image.channels() != 1)
-		cvtColor(image, gray_image, CV_RGB2GRAY);
+		cvtColor(image, gray_image, CV_BGR2GRAY);
 	else
 		gray_image = image.clone();
 

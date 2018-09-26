@@ -34,6 +34,7 @@ public:
 	GeoMatch(void);
 	~GeoMatch(void);
 
+
 	int CreateGeoMatchModel(Mat &src,double,double);
 	double FindGeoMatchModel(Mat srcarr,double minScore,double greediness, Point &resultPoint,Mat assist_score);
 	void DrawContours(Mat &source, Point COG,CvScalar,int);

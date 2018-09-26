@@ -1,16 +1,4 @@
 ﻿//
-#include <stdio.h>
-#include <tchar.h>
-#include <iostream>
-#include <fstream>
-#include <map>
-#include <iomanip>
-#include <io.h>
-using namespace std;
-#include "opencv2/highgui/highgui.hpp"
-#include "opencv2/imgproc/imgproc.hpp"  
-#include "opencv2/core/core.hpp"
-using namespace cv;
 
 
 # define MAX_RETINEX_SCALES    8     /* Retinex最多可采用的尺度的数目 */   
