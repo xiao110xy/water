@@ -219,6 +219,7 @@ void compute_water_area(Mat im, vector<assist_information> &assist_files, string
 			continue;
 		}
 
+
 		bool flag = false;
 		// 获得水位线,两种方式选择
 		string temp_ref(ref_name.begin(), ref_name.end() - 4);
@@ -231,12 +232,27 @@ void compute_water_area(Mat im, vector<assist_information> &assist_files, string
 			//continue;
 		}
 		else {
+
+
 			assist_file.ref_image = imread(temp_ref);// 历史参考数据
 			
 			if (!isgrayscale(im)) {
 				water_line = get_water_line(assist_file);
 				int n_length = 7.0*assist_file.base_image.rows/assist_file.length;
 				Mat gc_im = assist_file.expand_wrap_image.clone();
+				Mat gc_im_hsv;
+				//cvtColor(gc_im, gc_im_hsv, CV_BGR2HSV_FULL);
+				//vector<Mat> splt;
+				//split(gc_im_hsv, splt);
+				//Mat result = Mat::zeros(gc_im.size(), CV_8UC1);
+				//for (int i = 0; i < result.total(); ++i) {
+				//	int h, s, v;
+				//	h = *(splt[0].ptr<uchar>(0) + i);
+				//	s = *(splt[1].ptr<uchar>(0) + i);
+				//	v = *(splt[2].ptr<uchar>(0) + i);
+				//	if ((h > 100) && (s < 80) && (v > 100))
+				//		*(result.ptr<uchar>(0) + i) = 255;
+				//}
 				if (water_line < n_length) {
 					water_line = get_water_line_day(gc_im, assist_file, assist_file.base_image.rows-n_length);
 					if (water_line < 0)
@@ -246,7 +262,6 @@ void compute_water_area(Mat im, vector<assist_information> &assist_files, string
 					}
 				}
 				else {
-					Mat gc_im_hsv;
 					retinex_process(gc_im, gc_im_hsv);
 					int water_line1 = get_water_line_day(gc_im, assist_file, water_line);
 					int water_line2 = get_water_line_day(gc_im_hsv, assist_file, water_line);
@@ -508,6 +523,10 @@ bool correct_control_point(Mat im, assist_information & assist_file)
 	//最近邻与次近邻距离比匹配
 	Ptr<DescriptorMatcher> matcher = new FlannBasedMatcher;
 	std::vector<vector<DMatch>> dmatchs;
+	if (assist_file.descriptors.total() < 5)
+		return false;
+	if (descriptors_2.total() < 5)
+		return false;
 	matcher->knnMatch(assist_file.descriptors, descriptors_2, dmatchs, 2);
 	// 不使用roi
 	Mat homography, match_line_image;
@@ -1910,24 +1929,24 @@ void save_file(Mat im, vector<assist_information> assist_files, map<string, stri
 		temp = "temp_";
 		cache_name.insert(cache_name.begin() + n, temp.begin(), temp.end());
 	}
-	//ofstream file_cache(cache_name);
-	//for (int i = 0; i < assist_files.size(); ++i) {
-	//	file_cache << "0,0,0,0,0," << (int)assist_files[i].point.size() << endl;
-	//	file_cache << fixed << (int)assist_files[i].roi[0] << ",";
-	//	file_cache << fixed << (int)assist_files[i].roi[1] << ",";
-	//	file_cache << fixed << (int)assist_files[i].roi[2] << ",";
-	//	file_cache << fixed << (int)assist_files[i].roi[3] << ";" << endl;
-	//	for (int j = 0; j < assist_files[i].point.size(); ++j) {
-	//		for (int k = 0; k < assist_files[i].point[j].size(); ++k) {
-	//			file_cache << fixed << setprecision(2) << (assist_files[i].point[j])[k];
-	//			if (k != 3)
-	//				file_cache << ",";
-	//			else
-	//				file_cache << ";" << endl;
-	//		}
-	//	}
-	//}
-	//file_cache.close();
+	ofstream file_cache(cache_name);
+	for (int i = 0; i < assist_files.size(); ++i) {
+		file_cache << "0,0,0,0,0," << (int)assist_files[i].point.size() << endl;
+		file_cache << fixed << (int)assist_files[i].roi[0] << ",";
+		file_cache << fixed << (int)assist_files[i].roi[1] << ",";
+		file_cache << fixed << (int)assist_files[i].roi[2] << ",";
+		file_cache << fixed << (int)assist_files[i].roi[3] << ";" << endl;
+		for (int j = 0; j < assist_files[i].point.size(); ++j) {
+			for (int k = 0; k < assist_files[i].point[j].size(); ++k) {
+				file_cache << fixed << setprecision(2) << (assist_files[i].point[j])[k];
+				if (k != 3)
+					file_cache << ",";
+				else
+					file_cache << ";" << endl;
+			}
+		}
+	}
+	file_cache.close();
 }
 
 vector<vector<double>> part_row_point(vector<vector<double>> point, int r1, int r2)
