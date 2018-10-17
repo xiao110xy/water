@@ -421,9 +421,10 @@ bool geo_match(Mat temp1, Mat temp2, float & score, Mat & draw_image, Point & re
 	matchTemplate(graySearchImg, grayTemplateImg, assist_score, CV_TM_CCOEFF_NORMED);
 	int r = assist_score.rows;
 	int c = assist_score.cols;
-	//assist_score.colRange(0, 0.2*c).setTo(-2);
-	//assist_score.colRange(0.8*c, c).setTo(-2);
-	//assist_score.rowRange(0.8*r, r).setTo(-2);
+	//assist_score.setTo(1);
+	assist_score.colRange(0, 0.2*c).setTo(-2);
+	assist_score.colRange(0.8*c, c).setTo(-2);
+	assist_score.rowRange(0.3*r, r).setTo(-2);
 
 
 	score = GM.FindGeoMatchModel(graySearchImg, minScore, greediness, result,assist_score);
