@@ -19,6 +19,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "format_image", "format_imag
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "split_bat", "split_bat\split_bat.vcxproj", "{59AC3295-AB8F-4C95-A79E-9CE46FCCAF0D}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gauge_make", "gauge_make\gauge_make.vcxproj", "{B30AD3B0-3905-4A78-828E-2E9398D75ABD}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -91,6 +93,14 @@ Global
 		{59AC3295-AB8F-4C95-A79E-9CE46FCCAF0D}.Release|x64.Build.0 = Release|x64
 		{59AC3295-AB8F-4C95-A79E-9CE46FCCAF0D}.Release|x86.ActiveCfg = Release|Win32
 		{59AC3295-AB8F-4C95-A79E-9CE46FCCAF0D}.Release|x86.Build.0 = Release|Win32
+		{B30AD3B0-3905-4A78-828E-2E9398D75ABD}.Debug|x64.ActiveCfg = Debug|x64
+		{B30AD3B0-3905-4A78-828E-2E9398D75ABD}.Debug|x64.Build.0 = Debug|x64
+		{B30AD3B0-3905-4A78-828E-2E9398D75ABD}.Debug|x86.ActiveCfg = Debug|Win32
+		{B30AD3B0-3905-4A78-828E-2E9398D75ABD}.Debug|x86.Build.0 = Debug|Win32
+		{B30AD3B0-3905-4A78-828E-2E9398D75ABD}.Release|x64.ActiveCfg = Release|x64
+		{B30AD3B0-3905-4A78-828E-2E9398D75ABD}.Release|x64.Build.0 = Release|x64
+		{B30AD3B0-3905-4A78-828E-2E9398D75ABD}.Release|x86.ActiveCfg = Release|Win32
+		{B30AD3B0-3905-4A78-828E-2E9398D75ABD}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

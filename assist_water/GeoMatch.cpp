@@ -131,6 +131,24 @@ int GeoMatch::CreateGeoMatchModel(Mat &src,double maxContrast,double minContrast
 	int curX,curY;
 	int flag=1;
 	noOfCordinates = 0;
+	//int max_value = 0;
+	//for (int i = 0; i < nmsEdges.total(); ++i) {
+	//	if (*(nmsEdges.ptr<float>(0) + i) > max_value)
+	//		max_value = *(nmsEdges.ptr<float>(0) + i);
+	//}
+	//vector<int> temp_value(max_value + 2, 0);
+	//for (int i = 0; i < nmsEdges.total(); ++i) {
+	//	++temp_value[floor(*(nmsEdges.ptr<float>(0) + i))];
+	//}
+	//max_value = 0;
+	//for (int i = temp_value.size() - 1; i >= 0;--i) {
+	//	max_value = max_value + temp_value[i];
+	//	if (max_value > nmsEdges.total()*0.05) {
+	//		maxContrast = i;
+	//		minContrast = maxContrast *0.4;
+	//		break;
+	//	}
+	//}
 	//Hysterisis threshold
 	for (i = 1; i < src.rows - 1; i++)
 	{
@@ -197,7 +215,24 @@ int GeoMatch::CreateGeoMatchModel(Mat &src,double maxContrast,double minContrast
 			}
 		}
 	}
-
+	//int m_step = 1 > noOfCordinates / 200 ? 1 : noOfCordinates / 200;
+	//vector< Point> temp_cordinates = cordinates;
+	//vector< double> temp_edgeDerivativeX = edgeDerivativeX;
+	//vector< double> temp_edgeDerivativeY = edgeDerivativeY;
+	//vector< double> temp_edgeMagnitude = edgeMagnitude;
+	//cordinates.clear();
+	//edgeDerivativeX.clear();
+	//edgeDerivativeY.clear();
+	//edgeMagnitude.clear();
+	//noOfCordinates = 0;
+	//for(int m=0;m< temp_cordinates.size();m = m+m_step)
+	//{
+	//	cordinates.push_back(temp_cordinates[m]);
+	//	edgeDerivativeX.push_back(temp_edgeDerivativeX[m]);
+	//	edgeDerivativeY.push_back(temp_edgeDerivativeY[m]);
+	//	edgeMagnitude.push_back(temp_edgeMagnitude[m]);
+	//	noOfCordinates++;
+	//}
 	//centerOfGravity.x = XSum /noOfCordinates; // center of gravity
 	//centerOfGravity.y = YSum /noOfCordinates ;	// center of gravity
 	////	
@@ -212,8 +247,6 @@ int GeoMatch::CreateGeoMatchModel(Mat &src,double maxContrast,double minContrast
 	//}
 	//
 
-
-	
 	modelDefined=true;
 	return 1;
 }
@@ -253,9 +286,11 @@ double GeoMatch::FindGeoMatchModel(Mat src,double minScore,double greediness, Po
 
 		
 	// stoping criterias to search for model
+	//double normMinScore = minScore /noOfCordinates; // precompute minumum score 
+	//double normGreediness = ((1- greediness * minScore)/(1-greediness)) /noOfCordinates; // precompute greedniness 
 	double normMinScore = minScore /noOfCordinates; // precompute minumum score 
 	double normGreediness = ((1- greediness * minScore)/(1-greediness)) /noOfCordinates; // precompute greedniness 
-		
+
 	for( i = 0; i < src.rows; i++ )
     {
 
@@ -280,6 +315,8 @@ double GeoMatch::FindGeoMatchModel(Mat src,double minScore,double greediness, Po
 			if (temp_score < assist_score.at<float>(i, j))
 				temp_score = assist_score.at<float>(i, j);
 		}
+	if (temp_score > 0.5)
+		temp_score = 0.5;
 	for (i = 0; i < assist_score.rows; i++)
 	{
 			for( j = 0; j < assist_score.cols; j++ )
@@ -317,7 +354,10 @@ double GeoMatch::FindGeoMatchModel(Mat src,double minScore,double greediness, Po
 					// check termination criteria
 					// if partial score score is less than the score than needed to make the required score at that position
 					// break serching at that coordinate.
-					//if( partialScore < (MIN((1-minScore ) + normGreediness*sumOfCoords,normMinScore*  sumOfCoords)))
+					//normMinScore = resultScore / noOfCordinates; // precompute minumum score 
+					//normGreediness = ((1 - greediness * resultScore) / (1 - greediness)) / noOfCordinates; // precompute greedniness 
+
+					//if( partialScore < (MIN((1-resultScore ) + normGreediness*sumOfCoords,normMinScore*  sumOfCoords)))
 					//	break;
 
 				}
@@ -422,9 +462,10 @@ bool geo_match(Mat temp1, Mat temp2, float & score, Mat & draw_image, Point & re
 	int r = assist_score.rows;
 	int c = assist_score.cols;
 	//assist_score.setTo(1);
-	assist_score.colRange(0, 0.2*c).setTo(-2);
-	assist_score.colRange(0.8*c, c).setTo(-2);
-	assist_score.rowRange(0.3*r, r).setTo(-2);
+	assist_score.colRange(0, 0.1*c).setTo(-2);
+	assist_score.colRange(0.9*c, c).setTo(-2);
+	assist_score.rowRange(0.5*r, r).setTo(-2);
+
 
 
 	score = GM.FindGeoMatchModel(graySearchImg, minScore, greediness, result,assist_score);

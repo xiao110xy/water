@@ -47,6 +47,7 @@ struct assist_information {
 	vector<vector<double>> correct_point;
 	//float correct_line;
 	// 校正用点
+	bool correct2poly = true;
 	vector<vector<double>> point;
 	Mat r;
 	Mat r_inv;
@@ -74,7 +75,7 @@ struct assist_information {
 
 // 读入辅助信息
 vector<string> getFiles(string folder, string firstname, string lastname);
-bool input_assist(Mat im,map<string, string> main_ini, vector<assist_information> &assist_files, vector<Mat> template_image);
+bool input_assist(Mat im,map<string, string> main_ini, vector<assist_information> &assist_files);
 bool get_number(string line_string, vector<double> &temp);
 bool input_assist_image(string file_name,assist_information &assist_file);
 // 处理主函数
@@ -94,7 +95,7 @@ bool isTooHighLightInNight(Mat im,int &water_line,int &gray_value);
 // 对原始影像进行配准
 bool correct_control_point(Mat im, assist_information &assist_file);
 vector<assist_registration> xy_match(const Mat &image_1, const Mat &image_2, vector<vector<DMatch>> &dmatchs, vector<KeyPoint> keys_1,
-	vector<KeyPoint> keys_2, string model,assist_information  assist_file);
+	vector<KeyPoint> keys_2, string model,int  ruler_number);
 
 void GetImageThreshold(Mat im, int &bestLowThresh, int& bestHighThresh);
 
@@ -123,7 +124,7 @@ int optimization_water_line(assist_information &assist_file, float water_line, d
 // 夜晚水位线
 float get_water_line_night(assist_information &assist_file);
 bool left_right_water(Mat gc_im,int length);
-int get_water_line_seg(Mat im, int length);
+int get_water_line_seg(Mat im, int length, int &line, float scale = 0.2);
 // 结果保存
 void save_file(Mat im, vector<assist_information> assist_files,map<string,string> main_ini);
 // 功能函数
