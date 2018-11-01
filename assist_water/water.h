@@ -80,6 +80,7 @@ bool get_number(string line_string, vector<double> &temp);
 bool input_assist_image(string file_name,assist_information &assist_file);
 // 处理主函数
 void compute_water_area(Mat im, vector<assist_information> &assist_files,string ref_name);
+void opt_assist_files(vector<assist_information> &assist_files);
 // 判断是白天还是黑夜
 bool isgrayscale(Mat im);
 // 判断是否是纯黑

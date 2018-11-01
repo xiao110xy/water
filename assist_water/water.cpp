@@ -69,9 +69,9 @@ bool input_assist(Mat im,map<string, string> main_ini, vector<assist_information
 		//
 		getline(assist_file_name, temp_name);
 		get_number(temp_name, temp);
-		if (temp.size() != 6) {
-			if (temp.size() == 7) {
-				temp_assist_file.roi_order = temp[4];
+		if (temp.size() != 5) {
+			if (temp.size() == 6) {
+				temp_assist_file.roi_order = temp[3];
 			}
 			else
 				break;
@@ -87,7 +87,7 @@ bool input_assist(Mat im,map<string, string> main_ini, vector<assist_information
 		if (!template_image.data)
 			return false;
 		temp_assist_file.base_image = template_image;
-		temp_assist_file.length = temp[3];
+		temp_assist_file.length = temp[2];
 		// roi
 		vector<double> roi;
 		getline(assist_file_name, temp_name);
@@ -252,64 +252,20 @@ void compute_water_area(Mat im, vector<assist_information> &assist_files, string
 		if (!_file && !isgrayscale(im)) {
 			int water_line2;
 			water_line = get_water_line_seg(assist_file.base_image, assist_file.length, water_line2);
-			//continue;
 		}
 		else {
-			
 			int n_length = 7.0*assist_file.base_image.rows/assist_file.length;
 			if (!isgrayscale(im)) {
 				assist_file.ref_image = imread(temp_ref);// 历史参考数据
 				water_line = get_water_line(assist_file);
-				Mat gc_im = assist_file.expand_wrap_image.clone();
-
-				if (water_line < 0.7*n_length) {
-					//Mat gc_im_hsv;
-					//retinex_process(gc_im, gc_im_hsv);
-					water_line = get_water_line_day(gc_im, assist_file, assist_file.base_image.rows-n_length);
-					if (water_line < 0)
-						continue;
-					if (!water_line_isok(water_line, assist_file.base_image.rows, n_length)) {
-						water_line = get_water_line_day(gc_im, assist_file, water_line/2);
-					}
-				}
-				//else {
-				//	Mat gc_im_hsv;
-				//	retinex_process(gc_im, gc_im_hsv);
-
-				//	int water_line1 = get_water_line_day(gc_im, assist_file, water_line,0.2);
-				//	int water_line2 = get_water_line_day(gc_im_hsv, assist_file, water_line,0.4);
-				//	if (water_line_isok(water_line1, gc_im.rows, n_length)) {
-				//		if (water_line_isok(water_line2, gc_im.rows, n_length)) {
-				//			// 都对
-				//			if (water_line1 > water_line2 ) {
-				//				water_line = water_line1;
-				//			}
-				//			else {
-				//				if (abs(water_line - water_line1) < abs(water_line - water_line2)) {
-				//					if (abs(water_line1 - water_line2) > 2*n_length && !assist_file.left_right_no_water)
-				//						water_line = water_line2;
-				//					else
-				//						water_line = water_line1;
-				//				}
-				//				else {
-				//					water_line = water_line2;
-				//				}
-				//			}
-				//		}
-				//		else {
-				//			water_line = water_line1;
-				//		}
-
+				//Mat gc_im = assist_file.expand_wrap_image.clone();
+				//if (water_line < 0.7*n_length) {
+				//	water_line = get_water_line_day(gc_im, assist_file, assist_file.base_image.rows-n_length);
+				//	if (water_line < 0)
+				//		continue;
+				//	if (!water_line_isok(water_line, assist_file.base_image.rows, n_length)) {
+				//		water_line = get_water_line_day(gc_im, assist_file, water_line/2);
 				//	}
-				//	else {
-				//		if (water_line_isok(water_line2, gc_im.rows, n_length)) {
-				//			water_line = water_line2;
-				//		}
-				//		else {
-				//			// 维持现有
-				//		}
-				//	}
-
 				//}
 			}
 			else {
@@ -319,9 +275,10 @@ void compute_water_area(Mat im, vector<assist_information> &assist_files, string
 			if (water_line<0) {
 				continue;
 			}
-			if (water_line > assist_file.base_image.rows-1) {
+			if (water_line > assist_file.base_image.rows- 1.5*assist_file.base_image.rows / assist_file.length) {
 				water_line = assist_file.base_image.rows - 1;
  			}
+
 		}
 		assist_file.water_number = (assist_file.base_image.rows - water_line - 1) / assist_file.base_image.rows*assist_file.length;
 		Mat water_line_point = Mat::zeros(Size(2, 2), CV_64F);
@@ -338,6 +295,46 @@ void compute_water_area(Mat im, vector<assist_information> &assist_files, string
 		_file.close();
 
 	}
+
+
+}
+void opt_assist_files(vector<assist_information>& assist_files)
+{
+	vector<assist_information> temp_assist_files;
+	for (int i = 0; i < assist_files.size(); ++i) {
+		if (assist_files[i].parrallel_lines.size() < 1)
+			continue;
+		else
+			temp_assist_files.push_back(assist_files[i]);
+	}
+	stable_sort(temp_assist_files.begin(), temp_assist_files.end(),
+		[](assist_information a, assist_information b) {return a.correct_score > b.correct_score; });
+	vector<bool> assist_file_flag(temp_assist_files.size(), true);
+	for (int i = 0; i < temp_assist_files.size(); ++i) {
+		if (!assist_file_flag[i])
+			continue;
+		int x1 = 9999, x2 = 0;
+		x1 = x1 < temp_assist_files[i].parrallel_lines[0].x ? x1 : temp_assist_files[i].parrallel_lines[0].x;
+		x1 = x1 < temp_assist_files[i].parrallel_lines[1].x ? x1 : temp_assist_files[i].parrallel_lines[1].x;
+		x2 = x2 > temp_assist_files[i].parrallel_lines[2].x ? x2 : temp_assist_files[i].parrallel_lines[2].x;
+		x2 = x2 > temp_assist_files[i].parrallel_lines[3].x ? x2 : temp_assist_files[i].parrallel_lines[3].x;
+		for (int j = i + 1; j < temp_assist_files.size(); ++j) {
+			for (int k = 0; k < 4; ++k) {
+				if (temp_assist_files[j].parrallel_lines[k].x >= x1 - 10 &&
+					temp_assist_files[j].parrallel_lines[k].x <= x2 + 10) {
+					assist_file_flag[j] = false;
+					break;
+				}
+			}
+		}
+	}
+	assist_files.clear();
+	for (int i = 0; i < temp_assist_files.size(); ++i) {
+		if (assist_file_flag[i])
+			assist_files.push_back(temp_assist_files[i]);
+	}
+	stable_sort(assist_files.begin(), assist_files.end(),
+		[](assist_information a, assist_information b) {return a.roi_order < b.roi_order; });
 }
 bool isgrayscale(Mat im)
 {
@@ -397,7 +394,7 @@ bool isblack(Mat im, assist_information assist_file)
 			num_zeros = num_zeros + 1;
 	}
 	num_zeros = num_zeros / assist_file.base_image.total();
-	if (num_zeros > 0.1)
+	if (num_zeros > 0.4)
 		return true;
 	return false;
 }
@@ -440,7 +437,7 @@ bool isblank(Mat im, assist_information &assist_file)
 
 	}
 	else {
-		
+	
 		Mat temp = image_rotate.rowRange(0, n_length).clone();
 		vector<Mat> splt;
 		split(temp, splt);
@@ -626,7 +623,7 @@ bool correct_control_point(Mat im, assist_information & assist_file)
 			split(assist_image, splt);
 			assist_image = splt[0].clone();
 		}
-		geo_match(temp, assist_image,score, draw_image, result);
+		geo_match(temp, assist_image,score, draw_image, result, !isgrayscale(assist_image));
 		temp_r = result.y;
 		temp_c = result.x;
 
@@ -1421,6 +1418,7 @@ int get_water_line(assist_information &assist_file)
 		// 一个E区域
 		int r1 = i * 5 * n;
 		int r2 = (i + 1) * 5 * n;
+
 		Mat temp1 = i % 2 == 0 ? im(Range(r1, r2), Range(0, c1)) :
 			im(Range(r1, r2), Range(c1, c2));
 		Mat temp2 = i % 2 == 0 ? ref_image(Range(r1 + temp_step_r, r2 - temp_step_r), Range(0 + temp_step_c, c1 - temp_step_c)) :
@@ -1456,6 +1454,8 @@ int get_water_line(assist_information &assist_file)
 		int r2 = score1.size() * 5 * n + (i + 1) * n;
 		r1 = r1 >= 0 ? r1 : 0;
 		r2 = r2 <= im.rows - 1 ? r2 : im.rows - 1;
+		r1 = r1 < r2 ? r1 : r2;
+
 		Mat temp1 = score1.size() % 2 == 0 ? im(Range(r1, r2), Range(0, c1)) :
 			im(Range(r1, r2), Range(c1, c2));
 		Mat temp2 = score1.size() % 2 == 0 ?
@@ -1480,6 +1480,7 @@ int get_water_line(assist_information &assist_file)
 		int r2 = r1 + 1;
 		r1 = r1 >= 0 ? r1 : 0;
 		r2 = r2 <= im.rows - 1 ? r2 : im.rows - 1;
+		r1 = r1< r2 ? r1 : r2;
 		if (r1 == r2) {
 			temp_score.push_back(0.3*max_score + 0.1);
 			continue;
@@ -1848,7 +1849,7 @@ int get_water_line_seg(Mat im, int length, int &line, float scale)
 		}
 	}
 	if (ref_flag) {
-		return -1;
+		return im.rows;
 	}
 	ref_flag = false;
 	int temp_n = 0;

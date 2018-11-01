@@ -29,8 +29,10 @@ GeoMatch::~GeoMatch(void)
 
 int GeoMatch::CreateGeoMatchModel(Mat &src,double maxContrast,double minContrast)
 {
-
-
+	//Mat mask;
+	//threshold(src, mask,0, 255, CV_THRESH_OTSU | CV_THRESH_BINARY);
+	//vector <vector<Point>>contours;
+	//findContours(mask,contours,CV_RETR_EXTERNAL,CV_CHAIN_APPROX_NONE);
 	src.convertTo(src, CV_8UC1);
 
 	modelHeight = src.rows;		//Save Template height
@@ -131,45 +133,40 @@ int GeoMatch::CreateGeoMatchModel(Mat &src,double maxContrast,double minContrast
 	int curX,curY;
 	int flag=1;
 	noOfCordinates = 0;
-	//int max_value = 0;
-	//for (int i = 0; i < nmsEdges.total(); ++i) {
-	//	if (*(nmsEdges.ptr<float>(0) + i) > max_value)
-	//		max_value = *(nmsEdges.ptr<float>(0) + i);
-	//}
-	//vector<int> temp_value(max_value + 2, 0);
-	//for (int i = 0; i < nmsEdges.total(); ++i) {
-	//	++temp_value[floor(*(nmsEdges.ptr<float>(0) + i))];
-	//}
-	//max_value = 0;
-	//for (int i = temp_value.size() - 1; i >= 0;--i) {
-	//	max_value = max_value + temp_value[i];
-	//	if (max_value > nmsEdges.total()*0.05) {
-	//		maxContrast = i;
-	//		minContrast = maxContrast *0.4;
-	//		break;
-	//	}
-	//}
+	int max_value = 0;
+	for (int i = 0; i < magMat.total(); ++i) {
+		if (*(magMat.ptr<double>(0) + i) > max_value)
+			max_value = *(magMat.ptr<double>(0) + i);
+	}
+	vector<int> temp_value(max_value + 2, 0);
+	for (int i = 0; i < magMat.total(); ++i) {
+		++temp_value[floor(*(magMat.ptr<double>(0) + i))];
+	}
+	max_value = 0;
+	for (int i = temp_value.size() - 1; i >= 0;--i) {
+		max_value = max_value + temp_value[i];
+		if (max_value > magMat.total()*0.1) {
+			maxContrast = i/ MaxGradient*255;
+			minContrast = maxContrast *0.3;
+			break;
+		}
+	}
 	//Hysterisis threshold
 	for (i = 1; i < src.rows - 1; i++)
 	{
 		for (j = 1; j < src.cols - 1; j++)
 		{
 			fdx = gx.at<short>(i, j);
-			fdy = gy.at<short>(i, j);        // read x, y derivatives
-				
+			fdy = gy.at<short>(i, j);        // read x, y derivatives	
 			MagG = sqrt(fdx*fdx + fdy*fdy); //Magnitude = Sqrt(gx^2 +gy^2)
 			DirG =cvFastArctan((float)fdy,(float)fdx);	 //Direction = tan(y/x)
-		
-			////((uchar*)(imgGDir->imageData + imgGDir->widthStep*i))[j]= MagG;
 			flag=1;
 			if(nmsEdges.at<float>(i, j) < maxContrast)
 			{
 				if(nmsEdges.at<float>(i, j) < minContrast)
 				{
-					
 					nmsEdges.at<float>(i, j) =0;
 					flag=0; // remove from edge
-					////((uchar*)(imgGDir->imageData + imgGDir->widthStep*i))[j]=0;
 				}
 				else
 				{   // if any of 8 neighboring pixel is not greater than max contraxt remove from edge
@@ -189,33 +186,111 @@ int GeoMatch::CreateGeoMatchModel(Mat &src,double maxContrast,double minContrast
 				}
 				
 			}
-			
 			// save selected edge information
-			curX=j;	curY=i;
-			if(flag!=0)
+			curX = j;	curY = i;
+			if (flag != 0)
 			{
-				if(fdx!=0 || fdy!=0)
-				{		
-					XSum = XSum +curX;
-					YSum = YSum +curY; // Row sum and column sum for center of gravity
-					
+				if (fdx != 0 || fdy != 0)
+				{
+					XSum = XSum + curX;
+					YSum = YSum + curY; // Row sum and column sum for center of gravity
+
 					cordinates.push_back(Point(curX, curY));
 
 					edgeDerivativeX.push_back(fdx);
 					edgeDerivativeY.push_back(fdy);
-					
+
 					//handle divide by zero
-					if(MagG!=0)
-						edgeMagnitude.push_back(1/MagG);  // gradient magnitude 
+					if (MagG != 0)
+						edgeMagnitude.push_back(1 / MagG);  // gradient magnitude 
 					else
 						edgeMagnitude.push_back(0);  // gradient magnitude 
-															
+
 					noOfCordinates++;
 				}
 			}
 		}
 	}
-	//int m_step = 1 > noOfCordinates / 200 ? 1 : noOfCordinates / 200;
+	//int n = 0;
+	//for (i = 1; i < nmsEdges.rows - 1; i++)
+	//{
+	//	n = 0;
+	//	for (j = 1; j < nmsEdges.cols/2; j++)
+	//	{
+	//		fdx = gx.at<short>(i, j);
+	//		fdy = gy.at<short>(i, j);
+	//		if (nmsEdges.at<float>(i,j)> 0)
+	//		{
+	//			if (fdx != 0 || fdy != 0)
+	//			{
+	//				nmsEdges.at<float>(i, j) = 0;
+	//				cordinates.push_back(Point(j, i));
+	//				edgeDerivativeX.push_back(fdx);
+	//				edgeDerivativeY.push_back(fdy);
+	//				if (MagG != 0)
+	//					edgeMagnitude.push_back(1 / MagG);  // gradient magnitude 
+	//				else
+	//					edgeMagnitude.push_back(0);  // gradient magnitude 
+	//				noOfCordinates++;
+	//				n++;
+	//				if (n==2)
+	//					break;
+	//			}
+	//		}
+	//	}
+	//	n = 0;
+	//	for (j = nmsEdges.cols - 2; j > nmsEdges.cols/2; --j)
+	//	{
+	//		fdx = gx.at<short>(i, j);
+	//		fdy = gy.at<short>(i, j);
+	//		if (nmsEdges.at<float>(i, j) > 0)
+	//		{
+	//			if (fdx != 0 || fdy != 0)
+	//			{
+	//				nmsEdges.at<float>(i, j) = 0;
+	//				cordinates.push_back(Point(j, i));
+	//				edgeDerivativeX.push_back(fdx);
+	//				edgeDerivativeY.push_back(fdy);
+	//				if (MagG != 0)
+	//					edgeMagnitude.push_back(1 / MagG);  // gradient magnitude 
+	//				else
+	//					edgeMagnitude.push_back(0);  // gradient magnitude 
+	//				noOfCordinates++;
+	//				n++;
+	//				if (n == 2)
+	//					break;
+	//			}
+	//		}
+	//	}
+	//}
+	//for (j = 1; j < nmsEdges.cols - 1; j++)
+	//{
+	//	n = 0;
+	//	for (i = 1; i < nmsEdges.rows/2; i++)
+	//	{
+	//		fdx = gx.at<short>(i, j);
+	//		fdy = gy.at<short>(i, j);
+	//		if (nmsEdges.at<float>(i, j) > 0)
+	//		{
+	//			if (fdx != 0 || fdy != 0)
+	//			{
+	//				nmsEdges.at<float>(i, j) = 0;
+	//				cordinates.push_back(Point(j, i));
+	//				edgeDerivativeX.push_back(fdx);
+	//				edgeDerivativeY.push_back(fdy);
+	//				if (MagG != 0)
+	//					edgeMagnitude.push_back(1 / MagG);  // gradient magnitude 
+	//				else
+	//					edgeMagnitude.push_back(0);  // gradient magnitude 
+	//				noOfCordinates++;
+	//				n++;
+	//				if (n == 2)
+	//					break;
+	//			}
+	//		}
+	//	}
+	//}
+	//float m_step = 1 > noOfCordinates / 200.0 ? 1 : noOfCordinates / 200.0;
 	//vector< Point> temp_cordinates = cordinates;
 	//vector< double> temp_edgeDerivativeX = edgeDerivativeX;
 	//vector< double> temp_edgeDerivativeY = edgeDerivativeY;
@@ -245,10 +320,31 @@ int GeoMatch::CreateGeoMatchModel(Mat &src,double maxContrast,double minContrast
 	//	temp=cordinates[m].y;
 	//	cordinates[m].y =temp- centerOfGravity.y;
 	//}
-	//
+	
 
 	modelDefined=true;
 	return 1;
+}
+
+void GeoMatch::MatchModelBetter(Mat &src)
+{
+	//vector< Point> temp_cordinates = cordinates;
+	//vector< double> temp_edgeDerivativeX = edgeDerivativeX;
+	//vector< double> temp_edgeDerivativeY = edgeDerivativeY;
+	//vector< double> temp_edgeMagnitude = edgeMagnitude;
+	//cordinates.clear();
+	//edgeDerivativeX.clear();
+	//edgeDerivativeY.clear();
+	//edgeMagnitude.clear();
+	//noOfCordinates = 0;
+	//for(int m=0;m< temp_cordinates.size();m = m+1)
+	//{
+	//	cordinates.push_back(temp_cordinates[m]);
+	//	edgeDerivativeX.push_back(temp_edgeDerivativeX[m]);
+	//	edgeDerivativeY.push_back(temp_edgeDerivativeY[m]);
+	//	edgeMagnitude.push_back(temp_edgeMagnitude[m]);
+	//	noOfCordinates++;
+	//}
 }
 
 
@@ -315,8 +411,6 @@ double GeoMatch::FindGeoMatchModel(Mat src,double minScore,double greediness, Po
 			if (temp_score < assist_score.at<float>(i, j))
 				temp_score = assist_score.at<float>(i, j);
 		}
-	if (temp_score > 0.5)
-		temp_score = 0.5;
 	for (i = 0; i < assist_score.rows; i++)
 	{
 			for( j = 0; j < assist_score.cols; j++ )
@@ -325,9 +419,9 @@ double GeoMatch::FindGeoMatchModel(Mat src,double minScore,double greediness, Po
 				//if (temp_r<0 || temp_c<0 || temp_r> assist_score.rows - 1 || temp_c> assist_score.cols - 1)
 				//	;
 				//else
-				if (assist_score.at<float>(i, j) < 0.3*temp_score)
-				//if (assist_score.at<float>(i, j) < -1)
-					continue;
+				if (!color_flag)
+					if (assist_score.at<float>(i, j) < 0.3*temp_score)
+						continue;
 				 partialSum = 0; // initilize partialSum measure
 				 for(m=0;m<noOfCordinates;m++)
 				 {
@@ -354,11 +448,11 @@ double GeoMatch::FindGeoMatchModel(Mat src,double minScore,double greediness, Po
 					// check termination criteria
 					// if partial score score is less than the score than needed to make the required score at that position
 					// break serching at that coordinate.
-					//normMinScore = resultScore / noOfCordinates; // precompute minumum score 
-					//normGreediness = ((1 - greediness * resultScore) / (1 - greediness)) / noOfCordinates; // precompute greedniness 
+					normMinScore = resultScore / noOfCordinates; // precompute minumum score 
+					normGreediness = ((1 - greediness * resultScore) / (1 - greediness)) / noOfCordinates; // precompute greedniness 
 
-					//if( partialScore < (MIN((1-resultScore ) + normGreediness*sumOfCoords,normMinScore*  sumOfCoords)))
-					//	break;
+					if( partialScore < (MIN((1-resultScore ) + normGreediness*sumOfCoords,normMinScore*  sumOfCoords)))
+						break;
 
 				}
 				if(partialScore > resultScore)
@@ -383,6 +477,13 @@ double GeoMatch::FindGeoMatchModel(Mat src,double minScore,double greediness, Po
 // draw contours around result image
 void GeoMatch::DrawContours(Mat &source, Point  COG,CvScalar color,int lineWidth)
 {
+	vector<Mat> splt(3, Mat());
+	if (source.channels() == 1) {
+		splt[0] = source;
+		splt[1] = source;
+		splt[2] = source;
+		merge(splt, source);
+	}
 	Point temp_point;
 	for(int i=0; i<noOfCordinates; i++)
 	{	
@@ -395,6 +496,14 @@ void GeoMatch::DrawContours(Mat &source, Point  COG,CvScalar color,int lineWidth
 // draw contour at template image
 void GeoMatch::DrawContours(Mat &source,CvScalar color,int lineWidth)
 {
+	vector<Mat> splt(3, Mat());
+	if (source.channels() == 1) {
+		splt[0] = source;
+		splt[1] = source;
+		splt[2] = source;
+		merge(splt, source);
+	}
+
 	Point point;
 	for(int i=0; i<noOfCordinates; i++)
 	{
@@ -407,14 +516,15 @@ void GeoMatch::DrawContours(Mat &source,CvScalar color,int lineWidth)
 }
 
 
-bool geo_match(Mat temp1, Mat temp2, float & score, Mat & draw_image, Point & result)
+bool geo_match(Mat temp1, Mat temp2, float & score, Mat & draw_image, Point & result,bool color_flag)
 {
 	score = -2;
 	GeoMatch GM;				// object to implent geometric matching	
+	GM.color_flag = color_flag;
 	int lowThreshold = 10;		//deafult value
 	int highThreashold = 50;	//deafult value
-	double minScore = 0.7;		//deafult value
-	double greediness = 0.8;		//deafult value
+	double minScore = 0.2;		//deafult value
+	double greediness = 0.4;		//deafult value
 	double total_time = 0;
 
 	//IplImage* templateImage = cvCloneImage(&(IplImage)temp2);
@@ -438,7 +548,8 @@ bool geo_match(Mat temp1, Mat temp2, float & score, Mat & draw_image, Point & re
 	{
 		grayTemplateImg = templateImage.clone();
 	}
-	GaussianBlur(grayTemplateImg, grayTemplateImg, cvSize(3, 3), 0);
+	GaussianBlur(grayTemplateImg, grayTemplateImg, cvSize(5, 5), 0);
+	
 	GM.CreateGeoMatchModel(grayTemplateImg,  80, 20);
 	draw_image = temp2.clone();
 	GM.DrawContours(draw_image, CV_RGB(0, 255, 0), 1);
@@ -455,13 +566,12 @@ bool geo_match(Mat temp1, Mat temp2, float & score, Mat & draw_image, Point & re
 	{
 		graySearchImg = searchImage.clone();
 	}
-
+	GaussianBlur(searchImage, searchImage, cvSize(5, 5), 0);
 	Mat assist_score;
 
 	matchTemplate(graySearchImg, grayTemplateImg, assist_score, CV_TM_CCOEFF_NORMED);
 	int r = assist_score.rows;
 	int c = assist_score.cols;
-	//assist_score.setTo(1);
 	assist_score.colRange(0, 0.1*c).setTo(-2);
 	assist_score.colRange(0.9*c, c).setTo(-2);
 	assist_score.rowRange(0.5*r, r).setTo(-2);
