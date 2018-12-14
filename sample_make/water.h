@@ -10,10 +10,7 @@
 #include <io.h>
 #include"sift.h"
 #include"match.h"
-#include "MeanShiftSegmentor.h"
 #include "GeoMatch.h"
-#include "retinex.h"
-#include "lsd.h"
 #define match_t 0.5
 struct assist_registration {
 	int distance_to_left=9999;
@@ -45,7 +42,6 @@ struct assist_information {
 	// 摄像头抖动
 	bool correct_flag = false;
 	double correct_score = -1;
-	vector<vector<double>> temp_correct_point;
 	vector<vector<double>> correct_point;
 	//float correct_line;
 	// 校正用点
@@ -86,6 +82,8 @@ void compute_water_area(Mat im, vector<assist_information> &assist_files,string 
 void opt_assist_files(vector<assist_information> &assist_files);
 // 判断是白天还是黑夜
 bool isgrayscale(Mat im);
+// 判断是否是纯黑
+bool isblack(Mat im, assist_information assist_file);
 // 判断是否全是水
 bool isblank(Mat im, assist_information &assist_file);
 // 判断是否已经是底部了，白天；判断左右是否有水，晚上；
@@ -114,21 +112,19 @@ float match_template_score(Mat temp1, Mat temp2);
 vector<float> process_score(vector<float> score, float score_t1, float score_t2);
 
 // 白天水位线
+float get_water_line_day(assist_information &assist_file, int water_line);
 float get_water_line_day(Mat gc_im, assist_information &assist_file, int water_line, float scale = 0.4);
-float get_water_line_day_nowater(Mat gc_im, assist_information &assist_file, int water_line, float scale = 0.4);
 int get_mask_line(Mat mask,int n_length, float scale=0.4, int class_n=3);
-int get_water_line(assist_information &assist_file,float a,float b );
+int get_water_line(assist_information &assist_file);
 Mat getBinMaskByMask(Mat mask);
 int get_best_line(Mat mask, int x, int y);
-// 根据短直线来
-vector<vector<float>> get_line(Mat image, vector<vector<float>>& lines1, vector<vector<float>>& lines2, float det_v = 5, float det_h = 5);
-Mat draw_line(Mat data, vector<vector<float>> lines, int base_x =0,vector<uchar> rgb = vector < uchar>{ 0, 0, 255 });
-
+Mat guidedFilter(Mat srcImage, Mat &guideImage, int radius, double eps);
+Mat color_tansform(Mat data, Mat ref_image);
+int optimization_water_line(assist_information &assist_file, float water_line, double m_SigmaS, double m_SigmaR);
 // 夜晚水位线
-float get_water_line_night(Mat im,assist_information &assist_file);
-float get_water_line_night_local(Mat im,assist_information &assist_file);
+float get_water_line_night(assist_information &assist_file);
 bool left_right_water(Mat gc_im,int length);
-int get_water_line_seg(Mat im, int length, int add_rows = 100, float scale = 0.2);
+int get_water_line_seg(Mat im, int length, int &line, float scale = 0.2);
 // 结果保存
 void save_file(Mat im, vector<assist_information> assist_files,map<string,string> main_ini);
 // 功能函数

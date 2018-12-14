@@ -419,9 +419,9 @@ double GeoMatch::FindGeoMatchModel(Mat src,double minScore,double greediness, Po
 				//if (temp_r<0 || temp_c<0 || temp_r> assist_score.rows - 1 || temp_c> assist_score.cols - 1)
 				//	;
 				//else
-				//if (!color_flag)
-				//if (assist_score.at<float>(i, j) < 0.3*temp_score)
-				//	continue;
+				if (!color_flag)
+					if (assist_score.at<float>(i, j) < 0.3*temp_score)
+						continue;
 				 partialSum = 0; // initilize partialSum measure
 				 for(m=0;m<noOfCordinates;m++)
 				 {
@@ -523,8 +523,9 @@ bool geo_match(Mat temp1, Mat temp2, float & score, Mat & draw_image, Point & re
 	GM.color_flag = color_flag;
 	int lowThreshold = 10;		//deafult value
 	int highThreashold = 50;	//deafult value
-	double minScore = 0.6;		//deafult value
+	double minScore = 0.2;		//deafult value
 	double greediness = 0.4;		//deafult value
+	double total_time = 0;
 
 	//IplImage* templateImage = cvCloneImage(&(IplImage)temp2);
 	//if (templateImage == NULL)
@@ -547,7 +548,7 @@ bool geo_match(Mat temp1, Mat temp2, float & score, Mat & draw_image, Point & re
 	{
 		grayTemplateImg = templateImage.clone();
 	}
-	GaussianBlur(grayTemplateImg, grayTemplateImg, cvSize(3,3), 0);
+	GaussianBlur(grayTemplateImg, grayTemplateImg, cvSize(5, 5), 0);
 	
 	GM.CreateGeoMatchModel(grayTemplateImg,  80, 20);
 	draw_image = temp2.clone();
@@ -558,6 +559,7 @@ bool geo_match(Mat temp1, Mat temp2, float & score, Mat & draw_image, Point & re
 	// Convert color image to gray image. 
 	if (searchImage.channels() == 3)
 	{
+
 		cvtColor(searchImage, graySearchImg, CV_BGR2GRAY);
 	}
 	else
@@ -570,25 +572,17 @@ bool geo_match(Mat temp1, Mat temp2, float & score, Mat & draw_image, Point & re
 	matchTemplate(graySearchImg, grayTemplateImg, assist_score, CV_TM_CCOEFF_NORMED);
 	int r = assist_score.rows;
 	int c = assist_score.cols;
-	//assist_score.colRange(0, 0.1*c).setTo(-2);
-	//assist_score.colRange(0.9*c, c).setTo(-2);
+	assist_score.colRange(0, 0.1*c).setTo(-2);
+	assist_score.colRange(0.9*c, c).setTo(-2);
 	assist_score.rowRange(0.5*r, r).setTo(-2);
 
 
+
 	score = GM.FindGeoMatchModel(graySearchImg, minScore, greediness, result,assist_score);
-	//result.x = 726;
-	//result.y = 3;
-	//score = 0.9;
 
 	draw_image = temp1.clone();
 	GM.DrawContours(draw_image, result, CV_RGB(0, 255, 0), 1);
-	//score = GM.FindGeoMatchModel(255-graySearchImg, minScore, greediness, result, assist_score);
-	////result.x = 726;
-	////result.y = 3;
-	////score = 0.9;
 
-	//draw_image = temp1.clone();
-	//GM.DrawContours(draw_image, result, CV_RGB(0, 255, 0), 1);
 
 	//result.x = result.x - GM.centerOfGravity.x;
 	//result.y = result.y - GM.centerOfGravity.y;

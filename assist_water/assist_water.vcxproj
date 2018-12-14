@@ -67,7 +67,7 @@
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Project="C:\opencv-2.4.13.5\opencv2413_static_xp.props" />
+    <Import Project="C:\opencv-3.4.1\xy_opencv\opencv341.props" />
   </ImportGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
@@ -99,6 +99,7 @@
       </SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
+      <IntrinsicFunctions>false</IntrinsicFunctions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -194,6 +195,7 @@
     <ClInclude Include="BgImage.h" />
     <ClInclude Include="dehazing.h" />
     <ClInclude Include="GeoMatch.h" />
+    <ClInclude Include="lsd.h" />
     <ClInclude Include="match.h" />
     <ClInclude Include="MeanShiftSegmentor.h" />
     <ClInclude Include="ms.h" />
@@ -219,6 +221,7 @@
     <ClCompile Include="BgImage.cpp" />
     <ClCompile Include="dehazing.cpp" />
     <ClCompile Include="GeoMatch.cpp" />
+    <ClCompile Include="lsd.cpp" />
     <ClCompile Include="match.cpp" />
     <ClCompile Include="MeanShiftSegmentor.cpp" />
     <ClCompile Include="ms.cpp" />
