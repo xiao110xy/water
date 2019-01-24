@@ -10,10 +10,9 @@
 #include <io.h>
 #include"sift.h"
 #include"match.h"
-#include "MeanShiftSegmentor.h"
-#include "GeoMatch.h"
 #include "retinex.h"
 #include "lsd.h"
+#include "GeoMatch.h"
 #define match_t 0.5
 struct assist_registration {
 	int distance_to_left=9999;
@@ -109,7 +108,6 @@ Mat compute_point(Mat point, Mat r);
 double compute_rms(Mat base_point, Mat wrap_point, Mat r);
 // 水位线识别
 bool get_label_mask(Mat mask,int &label, Mat &label_mask, double,int y_t);
-float get_water_line_t2b(Mat im, double length,Mat& segment_result);
 float match_template_score(Mat temp1, Mat temp2);
 vector<float> process_score(vector<float> score, float score_t1, float score_t2);
 
