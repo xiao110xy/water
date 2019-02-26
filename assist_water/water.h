@@ -1,4 +1,5 @@
 ﻿#pragma once
+#define GET_VARIABLE_NAME(Variable) (#Variable)
 #include <iostream>
 #include <algorithm>
 #include <vector> 
@@ -14,6 +15,8 @@
 #include "lsd.h"
 #include "GeoMatch.h"
 #define match_t 0.5
+static 
+
 struct assist_registration {
 	int distance_to_left=9999;
 	Mat match_line_image;
@@ -28,6 +31,18 @@ struct xy_feature {
 	double dy;
 };
 struct assist_information {
+	//
+	map<string, float> xy_param{
+		// 摄像头抖动
+		// 白天水位获取
+		{"score1_t1",0.8},
+		{"score1_t2",0.95},
+		{"score2_t1",0.6},
+		{"score2_t2",0.8},
+		{"score3_t1",0.3},
+		{"score3_t2",0.6}
+		// 夜晚水位获取
+	};
 	// 基本信息
 	Mat base_image;
 	Mat wrap_image;
@@ -80,7 +95,9 @@ vector<string> getFiles(string folder, string firstname, string lastname);
 bool input_assist(Mat im,map<string, string> main_ini, vector<assist_information> &assist_files);
 bool get_number(string line_string, vector<double> &temp);
 bool input_assist_image(string file_name,assist_information &assist_file);
+void upadate_param(vector<assist_information> &assist_files, map<string, string> main_ini);
 // 处理主函数
+
 void compute_water_area(Mat im, vector<assist_information> &assist_files,string ref_name);
 void opt_assist_files(vector<assist_information> &assist_files);
 // 判断是白天还是黑夜
@@ -115,7 +132,7 @@ vector<float> process_score(vector<float> score, float score_t1, float score_t2)
 float get_water_line_day(Mat gc_im, assist_information &assist_file, int water_line, float scale = 0.4);
 float get_water_line_day_nowater(Mat gc_im, assist_information &assist_file, int water_line, float scale = 0.4);
 int get_mask_line(Mat mask,int n_length, float scale=0.4, int class_n=3);
-int get_water_line(assist_information &assist_file,float a,float b );
+int get_water_line(assist_information &assist_file );
 Mat getBinMaskByMask(Mat mask);
 int get_best_line(Mat mask, int x, int y);
 // 根据短直线来

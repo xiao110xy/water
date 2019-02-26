@@ -231,6 +231,50 @@ bool input_assist_image(string file_name, assist_information &assist_file)
 	assist_file.assist_image = temp_image.clone();
 	return true;
 }
+void upadate_param(vector<assist_information>& assist_files, map<string, string> main_ini)
+{
+	for (auto &assist_file : assist_files) {
+		string temp = main_ini["assist_txt"];
+		string base_name, base_path;
+		for (int i = temp.size(); i >= 0; --i) {
+			if (temp[i] == 47 || temp[i] == 92) {
+				base_name.append(temp.begin() + i + 1, temp.end() - 4);
+				base_path.append(temp.begin(), temp.begin() + i + 1);
+				break;
+			}
+		}
+		if (base_path == "") {
+			base_name.append(temp.begin(), temp.end() - 4);
+		}
+		temp = base_path + "param_" + base_name + "_" + to_string(assist_file.ref_index) + ".txt";
+		fstream assist_file_name(temp);
+		if (!assist_file_name)
+			continue;
+		while (!assist_file_name.eof()) {
+			temp.clear();
+			getline(assist_file_name, temp);
+			if (temp.size() < 4)
+				break;
+			for (int i = 1; i < temp.size() - 1; ++i) {
+				if (temp[i] == 61) {
+					string temp1(temp.begin(), temp.begin() + i);
+					float temp_value = 0;
+					int n = -1;
+					int j = i+1;
+					for (; j < temp.size()-1; ++j) {
+						if (temp[j] >= 48 && temp[j] <= 57) {
+							temp_value = temp_value * 10 + temp[j] - 48;
+						}
+						if (temp[j] == 46)
+							n = j;
+					}
+					temp_value = n == -1 ? temp_value : temp_value / pow(10, j - n - 1);
+					assist_file.xy_param[temp1] = temp_value;
+				}
+			}
+		}
+	}
+}
 void compute_water_area(Mat im, vector<assist_information> &assist_files, string ref_name)
 {
 	for (auto &assist_file : assist_files) {
@@ -239,7 +283,7 @@ void compute_water_area(Mat im, vector<assist_information> &assist_files, string
 		// 旋转校正 少部分 包含对原始影像进行矫正
 		assist_file.wrap_image = Mat::zeros(Size(assist_file.base_image.cols,
 			add_row + assist_file.base_image.rows), CV_64F);
-		assist_file.correct2poly = false;
+		assist_file.correct2poly = true;
 		Mat image_rotate = correct_image(im, assist_file);
 		
 		//判断是否为无图像区域
@@ -260,7 +304,7 @@ void compute_water_area(Mat im, vector<assist_information> &assist_files, string
 			string temp = temp_ref + "_" + to_string(assist_file.ref_index) + string(ref_name.end() - 4, ref_name.end());;
 			assist_file.ref_image = imread(temp);
 			if (assist_file.ref_image.data)
-				water_lines.push_back(get_water_line(assist_file, 0, 0.95));
+				water_lines.push_back(get_water_line(assist_file));
 			else {
 				for (int i = 0;; ++i) {
 					temp = temp_ref + "_" + to_string(assist_file.ref_index) + "_" + to_string(i + 1) + string(ref_name.end() - 4, ref_name.end());
@@ -268,7 +312,7 @@ void compute_water_area(Mat im, vector<assist_information> &assist_files, string
 					if (!assist_file.ref_image.data)
 						break;
 					else
-						water_lines.push_back(get_water_line(assist_file, 0, 0.95));
+						water_lines.push_back(get_water_line(assist_file));
 				}
 			}
 
@@ -1380,7 +1424,7 @@ int get_mask_line(Mat mask, int n_length,float scale,int class_n)
 	}
 	return r;
 }
-int get_water_line(assist_information &assist_file, float a, float b)
+int get_water_line(assist_information &assist_file)
 {
 	Mat im = assist_file.wrap_image;
 	Mat ref_image = assist_file.ref_image;
@@ -1436,7 +1480,7 @@ int get_water_line(assist_information &assist_file, float a, float b)
 	}
 	scores.push_back(temp_score);
 	// 后处理
-	score1 = process_score(temp_score, 0.8,0.9);
+	score1 = process_score(temp_score , assist_file.xy_param["score1_t1"],assist_file.xy_param["score1_t2"]);
 	if (score1.size() == (length / 5))
 		return im.rows + 2;
 	temp_score.clear();
@@ -1464,7 +1508,7 @@ int get_water_line(assist_information &assist_file, float a, float b)
 	scores.push_back(temp_score);
 
 	// 后处理
-	score2 = process_score(temp_score, 0.65,0.8);
+	score2 = process_score(temp_score, assist_file.xy_param["score2_t1"], assist_file.xy_param["score2_t2"]);
 	temp_score.clear();
 	// 子部分的值
 	for (int i = 0; i < n; ++i) {
@@ -1494,7 +1538,7 @@ int get_water_line(assist_information &assist_file, float a, float b)
 	scores.push_back(temp_score);
 	assist_file.scores = scores;
 	// 后处理
-	score3 = process_score(temp_score, 0.5, 0.8);
+	score3 = process_score(temp_score, assist_file.xy_param["score3_t1"], assist_file.xy_param["score3_t2"]);
 	temp_score.clear();
 	float water_number = length - 5 * score1.size() - score2.size() - score3.size() / 10.0;
 
@@ -1948,6 +1992,7 @@ void save_file(Mat im, vector<assist_information> assist_files, map<string, stri
 			line(result, temp.parrallel_lines[0], temp.parrallel_lines[1], Scalar(255, 0, 0), 2);
 			line(result, temp.parrallel_lines[2], temp.parrallel_lines[3], Scalar(255, 0, 0), 2);		
 		}
+
 		if (temp.water_lines.size() == 4){
 			// 画出水线
 			line(result, Point2d(temp.water_lines[0], temp.water_lines[1]), Point2d(temp.water_lines[2], temp.water_lines[3]), Scalar(0, 255, 0), 2);
@@ -2008,59 +2053,49 @@ void save_file(Mat im, vector<assist_information> assist_files, map<string, stri
 			file << ",";
 		}
 		file << ";"<<endl;
-		//for (auto j : temp.scores) {
-		//	int m = 0;
-		//	for (auto k : j) {
-		//		file <<fixed << setprecision(2) << k;
-		//		file << ";";
-		//		++m;
-		//		if (m == 5) {
-		//			m = 0;
-		//			file << endl;
-		//		}
-		//	}
-		//	file <<'.'<< endl;
-		//}
 	}
 	file.close();
-	string cache_name;
-	string temp = main_ini["assist_txt"];
-	int n = 0;
-	for (int i = temp.size()-1; i >=0; --i) {
-		if (temp[i] == 47) {
-			n = i + 1;
-			break;
-		}		
-	}
-	if (n == 0)
-		cache_name = "temp_" + temp;
-	else {
-		cache_name = temp;
-		temp = "temp_";
-		cache_name.insert(cache_name.begin() + n, temp.begin(), temp.end());
-	}
-	ofstream file_cache(cache_name);
-	for (int i = 0; i < assist_files.size(); ++i) {
-		file_cache << "0,0,0,0,0," << (int)assist_files[i].point.size() << endl;
-		for (int j = 0; j < 3; ++j) {
-			file_cache << fixed << (int)assist_files[i].roi[j] << ",";
-		}
-		file_cache << fixed << (int)assist_files[i].roi[3] << ";" << endl;
-		for (int j = 0; j < 3; ++j) {
-			file_cache << fixed << (int)assist_files[i].sub_roi[j] << ",";
-		}
-		file_cache << fixed << (int)assist_files[i].sub_roi[3] << ";" << endl;
-		for (int j = 0; j < assist_files[i].point.size(); ++j) {
-			for (int k = 0; k < assist_files[i].point[j].size(); ++k) {
-				file_cache << fixed << setprecision(2) << (assist_files[i].point[j])[k];
-				if (k != 3)
-					file_cache << ",";
-				else
-					file_cache << ";" << endl;
-			}
-		}
-	}
-	file_cache.close();
+	// 保存temp
+
+	//string cache_name;
+	//string temp = main_ini["assist_txt"];
+	//int n = 0;
+	//for (int i = temp.size()-1; i >=0; --i) {
+	//	if (temp[i] == 47) {
+	//		n = i + 1;
+	//		break;
+	//	}		
+
+	//}
+	//if (n == 0)
+	//	cache_name = "temp_" + temp;
+	//else {
+	//	cache_name = temp;
+	//	temp = "temp_";
+	//	cache_name.insert(cache_name.begin() + n, temp.begin(), temp.end());
+	//}
+	//ofstream file_cache(cache_name);
+	//for (int i = 0; i < assist_files.size(); ++i) {
+	//	file_cache << "0,0,0,0,0," << (int)assist_files[i].point.size() << endl;
+	//	for (int j = 0; j < 3; ++j) {
+	//		file_cache << fixed << (int)assist_files[i].roi[j] << ",";
+	//	}
+	//	file_cache << fixed << (int)assist_files[i].roi[3] << ";" << endl;
+	//	for (int j = 0; j < 3; ++j) {
+	//		file_cache << fixed << (int)assist_files[i].sub_roi[j] << ",";
+	//	}
+	//	file_cache << fixed << (int)assist_files[i].sub_roi[3] << ";" << endl;
+	//	for (int j = 0; j < assist_files[i].point.size(); ++j) {
+	//		for (int k = 0; k < assist_files[i].point[j].size(); ++k) {
+	//			file_cache << fixed << setprecision(2) << (assist_files[i].point[j])[k];
+	//			if (k != 3)
+	//				file_cache << ",";
+	//			else
+	//				file_cache << ";" << endl;
+	//		}
+	//	}
+	//}
+	//file_cache.close();
 }
 
 vector<vector<double>> part_row_point(vector<vector<double>> point, int r1, int r2)

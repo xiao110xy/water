@@ -411,17 +411,17 @@ double GeoMatch::FindGeoMatchModel(Mat src,double minScore,double greediness, Po
 			if (temp_score < assist_score.at<float>(i, j))
 				temp_score = assist_score.at<float>(i, j);
 		}
-	for (i = 0; i < assist_score.rows; i++)
+	for (i = 0; i < assist_score.rows/2; i++)
 	{
 			for( j = 0; j < assist_score.cols; j++ )
              { 
-				//int temp_r = i-centerOfGravity.y, temp_c = j- centerOfGravity.x;
-				//if (temp_r<0 || temp_c<0 || temp_r> assist_score.rows - 1 || temp_c> assist_score.cols - 1)
-				//	;
-				//else
-				//if (!color_flag)
-				//if (assist_score.at<float>(i, j) < 0.3*temp_score)
-				//	continue;
+				int temp_r = i-centerOfGravity.y, temp_c = j- centerOfGravity.x;
+				if (temp_r<0 || temp_c<0 || temp_r> assist_score.rows - 1 || temp_c> assist_score.cols - 1)
+					;
+				else
+					if (!color_flag)
+						if (assist_score.at<float>(i, j) < 0.3*temp_score)
+						continue;
 				 partialSum = 0; // initilize partialSum measure
 				 for(m=0;m<noOfCordinates;m++)
 				 {
@@ -448,11 +448,11 @@ double GeoMatch::FindGeoMatchModel(Mat src,double minScore,double greediness, Po
 					// check termination criteria
 					// if partial score score is less than the score than needed to make the required score at that position
 					// break serching at that coordinate.
-					normMinScore = resultScore / noOfCordinates; // precompute minumum score 
-					normGreediness = ((1 - greediness * resultScore) / (1 - greediness)) / noOfCordinates; // precompute greedniness 
+					//normMinScore = resultScore / noOfCordinates; // precompute minumum score 
+					//normGreediness = ((1 - greediness * resultScore) / (1 - greediness)) / noOfCordinates; // precompute greedniness 
 
-					if( partialScore < (MIN((1-resultScore ) + normGreediness*sumOfCoords,normMinScore*  sumOfCoords)))
-						break;
+					//if( partialScore < (MIN((1-resultScore ) + normGreediness*sumOfCoords,normMinScore*  sumOfCoords)))
+					//	break;
 
 				}
 				if(partialScore > resultScore)
@@ -570,8 +570,8 @@ bool geo_match(Mat temp1, Mat temp2, float & score, Mat & draw_image, Point & re
 	matchTemplate(graySearchImg, grayTemplateImg, assist_score, CV_TM_CCOEFF_NORMED);
 	int r = assist_score.rows;
 	int c = assist_score.cols;
-	//assist_score.colRange(0, 0.1*c).setTo(-2);
-	//assist_score.colRange(0.9*c, c).setTo(-2);
+	assist_score.colRange(0, 0.1*c).setTo(-2);
+	assist_score.colRange(0.9*c, c).setTo(-2);
 	assist_score.rowRange(0.5*r, r).setTo(-2);
 
 
