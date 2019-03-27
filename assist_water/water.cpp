@@ -275,9 +275,10 @@ void upadate_param(vector<assist_information>& assist_files, map<string, string>
 		}
 	}
 }
-void compute_water_area(Mat im, vector<assist_information> &assist_files, string ref_name)
+void compute_water_area(Mat image, vector<assist_information> &assist_files, string ref_name)
 {
 	for (auto &assist_file : assist_files) {
+		Mat im = image.clone();
 		// 延伸一部分水尺区域
 		int add_row =  10.0*assist_file.base_image.rows / assist_file.length;
 		// 旋转校正 少部分 包含对原始影像进行矫正
@@ -339,7 +340,7 @@ void compute_water_area(Mat im, vector<assist_information> &assist_files, string
 			continue;
 		}
 		if (water_line > assist_file.base_image.rows - 1.5*assist_file.base_image.rows / assist_file.length) {
-			water_line = assist_file.base_image.rows + 2;
+			water_line = assist_file.base_image.rows-1;
 		}
 		assist_file.water_number = (assist_file.base_image.rows - water_line - 1) / assist_file.base_image.rows*assist_file.length;
 		Mat water_line_point = Mat::zeros(Size(2, 2), CV_64F);
@@ -656,7 +657,7 @@ bool correct_control_point(Mat im, assist_information & assist_file)
 	vector<vector<double>> temp_point;
 	vector<assist_registration> temp_assist_reg = xy_match(im, roi_image, dmatchs, assist_file.keypoints,keypoints_2,
 													model,1);
-	if (temp_assist_reg.size() == 1) {
+ 	if (temp_assist_reg.size() == 1) {
 		homography = temp_assist_reg[0].homography.clone();
 		temp_point = temp_assist_reg[0].points;
 		match_line_image = temp_assist_reg[0].match_line_image;

@@ -579,7 +579,15 @@ bool geo_match(Mat temp1, Mat temp2, float & score, Mat & draw_image, Point & re
 	//result.x = 726;
 	//result.y = 3;
 	//score = 0.9;
-
+	//float temp_score = -1;
+	//for (int i=0;i<assist_score.rows;++i)
+	//	for (int j = 0; j < assist_score.cols; ++j) {
+	//		if (assist_score.at<float>(i, j) > temp_score) {
+	//			temp_score = assist_score.at<float>(i, j);
+	//			result.x = j;
+	//			result.y = i;
+	//		}
+	//	}
 	draw_image = temp1.clone();
 	GM.DrawContours(draw_image, result, CV_RGB(0, 255, 0), 1);
 	//score = GM.FindGeoMatchModel(255-graySearchImg, minScore, greediness, result, assist_score);

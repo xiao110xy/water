@@ -167,7 +167,7 @@ void MySift::build_dog_pyramid(vector<vector<Mat>> &dog_pyramid, const vector<ve
 		vector<Mat> temp_vec;
 		for (auto j = 0; j < nOctaveLayers + 2; ++j)
 		{
-			Mat temp_img = gauss_pyramid[i][j + 1] - gauss_pyramid[i][j];
+			Mat temp_img = gauss_pyramid[i][j + 1].clone() - gauss_pyramid[i][j].clone();
 			temp_vec.push_back(temp_img);
 		}
 		dog_pyramid.push_back(temp_vec);
