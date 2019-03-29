@@ -46,6 +46,7 @@ struct assist_information {
 	// 基本信息
 	Mat base_image;
 	Mat wrap_image;
+	int add_row;
 	int length;
 	int ruler_number=1;
 	// 用于配准
