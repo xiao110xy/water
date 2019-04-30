@@ -118,6 +118,8 @@ bool input_assist(Mat im,map<string, string> main_ini, vector<assist_information
 		//
 		temp_assist_file.keypoints = keypoints;
 		temp_assist_file.descriptors = descriptors;
+		//  更新参数
+		upadate_param(temp_assist_file, main_ini);
 		// 如果没有，则保存
  		if (assist_files.size() == n_water - 1) {
 			temp_assist_file.correct_flag = correct_control_point(temp_im, temp_assist_file);
@@ -153,7 +155,7 @@ bool input_assist(Mat im,map<string, string> main_ini, vector<assist_information
 		for (int i = 0; i < assist_files.size(); ++i) {
 			assist_information temp_assist = assist_files[i];
 			if (temp_assist.correct_score > 1.5) {
-				int x1 = im.rows, x2 = 0;
+				int x1 = im.cols, x2 = 0;
 				if (temp_assist.temp_correct_point.size() < 2)
 					continue;
 				for (int j = 0; j < temp_assist.temp_correct_point.size(); ++j) {
@@ -231,46 +233,37 @@ bool input_assist_image(string file_name, assist_information &assist_file)
 	assist_file.assist_image = temp_image.clone();
 	return true;
 }
-void upadate_param(vector<assist_information>& assist_files, map<string, string> main_ini)
+void upadate_param(assist_information& assist_file, map<string, string> main_ini)
 {
-	for (auto &assist_file : assist_files) {
-		string temp = main_ini["assist_txt"];
-		string base_name, base_path;
-		for (int i = temp.size(); i >= 0; --i) {
-			if (temp[i] == 47 || temp[i] == 92) {
-				base_name.append(temp.begin() + i + 1, temp.end() - 4);
-				base_path.append(temp.begin(), temp.begin() + i + 1);
-				break;
-			}
+	string temp = main_ini["assist_txt"];
+	string base_name, base_path;
+	for (int i = temp.size(); i >= 0; --i) {
+		if (temp[i] == 47 || temp[i] == 92) {
+			base_name.append(temp.begin() + i + 1, temp.end() - 4);
+			base_path.append(temp.begin(), temp.begin() + i + 1);
+			break;
 		}
-		if (base_path == "") {
-			base_name.append(temp.begin(), temp.end() - 4);
-		}
-		temp = base_path + "param_" + base_name + "_" + to_string(assist_file.ref_index) + ".txt";
-		fstream assist_file_name(temp);
-		if (!assist_file_name)
-			continue;
-		while (!assist_file_name.eof()) {
-			temp.clear();
-			getline(assist_file_name, temp);
-			if (temp.size() < 4)
-				break;
-			for (int i = 1; i < temp.size() - 1; ++i) {
-				if (temp[i] == 61) {
-					string temp1(temp.begin(), temp.begin() + i);
-					float temp_value = 0;
-					int n = -1;
-					int j = i+1;
-					for (; j < temp.size()-1; ++j) {
-						if (temp[j] >= 48 && temp[j] <= 57) {
-							temp_value = temp_value * 10 + temp[j] - 48;
-						}
-						if (temp[j] == 46)
-							n = j;
-					}
-					temp_value = n == -1 ? temp_value : temp_value / pow(10, j - n - 1);
+	}
+	if (base_path == "") {
+		base_name.append(temp.begin(), temp.end() - 4);
+	}
+	temp = base_path + "param_" + base_name + "_" + to_string(assist_file.ref_index) + ".txt";
+	fstream assist_file_name(temp);
+	if (!assist_file_name)
+		return;
+	while (!assist_file_name.eof()) {
+		temp.clear();
+		getline(assist_file_name, temp);
+		if (temp.size() < 4)
+			break;
+		for (int i = 1; i < temp.size() - 1; ++i) {
+			if (temp[i] == 61) {
+				string temp1(temp.begin(), temp.begin() + i);
+				string temp2(temp.begin() + i+1, temp.end());
+				vector<double> temp_value;
+				get_number(temp2, temp_value);
+				if (temp_value.size()>0)
 					assist_file.xy_param[temp1] = temp_value;
-				}
 			}
 		}
 	}
@@ -424,7 +417,7 @@ bool isgrayscale(Mat im)
 			int score = abs((data[i])[0] - (data[i])[1]);
 			score += abs((data[i])[1] - (data[i])[2]);
 			score += abs((data[i])[0] - (data[i])[2]);
-			if (score <3)
+			if (score <20)
 				++num;
 		}
 		if (num / temp.total() < 0.8) {
@@ -462,7 +455,7 @@ bool isblank(Mat im, assist_information &assist_file)
 	Mat hist;
 	calcHist(&temp_im, 1, 0, Mat(), hist, 1, &histSize, &histRange, uniform, accumulate);
 	float temp1 = 0, temp2 = 0;
-	for (int i = 0; i < 40; ++i) {
+	for (int i = 0; i < 20; ++i) {
 		temp1 += hist.at<float>(i, 0);
 		temp2 += hist.at<float>(histSize - i - 1, 0);
 	}
@@ -660,7 +653,8 @@ bool correct_control_point(Mat im, assist_information & assist_file)
 	vector<vector<double>> temp_point;
 	vector<assist_registration> temp_assist_reg = xy_match(im, roi_image, dmatchs, assist_file.keypoints,keypoints_2,
 													model,1);
- 	if (temp_assist_reg.size() == 1) {
+	if(0){
+ 	//if (temp_assist_reg.size() == 1) {
 		homography = temp_assist_reg[0].homography.clone();
 		temp_point = temp_assist_reg[0].points;
 		match_line_image = temp_assist_reg[0].match_line_image;
@@ -699,7 +693,7 @@ bool correct_control_point(Mat im, assist_information & assist_file)
 		}
 		//temp.colRange(0, 700).setTo(Scalar{ 0,0,0 });
 		float score1 = -2,score2 = -2;
-		geo_match(temp, assist_image,score1, draw_image, result, !isgrayscale(assist_image));
+		geo_match(temp, assist_image,score1, draw_image, result, assist_file.xy_param["roi"],!isgrayscale(assist_image));
 		if (score1 > score) {
 			score = score1;
 			temp_r = result.y;
@@ -1484,7 +1478,7 @@ int get_water_line(assist_information &assist_file)
 	}
 	scores.push_back(temp_score);
 	// 后处理
-	score1 = process_score(temp_score , assist_file.xy_param["score1_t1"],assist_file.xy_param["score1_t2"]);
+	score1 = process_score(temp_score , assist_file.xy_param["score1_t1"][0],assist_file.xy_param["score1_t2"][0]);
 	if (score1.size() == (length / 5))
 		return im.rows + 2;
 	temp_score.clear();
@@ -1512,7 +1506,7 @@ int get_water_line(assist_information &assist_file)
 	scores.push_back(temp_score);
 
 	// 后处理
-	score2 = process_score(temp_score, assist_file.xy_param["score2_t1"], assist_file.xy_param["score2_t2"]);
+	score2 = process_score(temp_score, assist_file.xy_param["score2_t1"][0], assist_file.xy_param["score2_t2"][0]);
 	temp_score.clear();
 	// 子部分的值
 	for (int i = 0; i < n; ++i) {
@@ -1538,11 +1532,12 @@ int get_water_line(assist_information &assist_file)
 			score = score > (*(temp.ptr<float>(0) + i)) ? score : (*(temp.ptr<float>(0) + i));
 		}
 		temp_score.push_back(score);
+
 	}
 	scores.push_back(temp_score);
 	assist_file.scores = scores;
 	// 后处理
-	score3 = process_score(temp_score, assist_file.xy_param["score3_t1"], assist_file.xy_param["score3_t2"]);
+	score3 = process_score(temp_score, assist_file.xy_param["score3_t1"][0], assist_file.xy_param["score3_t2"][0]);
 	temp_score.clear();
 	float water_number = length - 5 * score1.size() - score2.size() - score3.size() / 10.0;
 
@@ -1712,6 +1707,9 @@ float get_water_line_night(Mat im,assist_information & assist_file)
 		water_line = get_water_line_seg(temp.colRange(c, c * 2), assist_file.length, add_row);
 	}
 
+	//temp = splt[0].rowRange(0, water_line).clone();
+	//temp_t = otsu(temp);
+	//threshold(temp, temp, temp_t, 255, CV_THRESH_BINARY);
 
 	if (assist_file.left_right_no_water) {
 		Mat result;
@@ -2042,6 +2040,7 @@ void save_file(Mat im, vector<assist_information> assist_files, map<string, stri
 	//	imwrite(image_result, result);
 	//}
 	//_file.close();
+
 	// 读写文件
 	// 读写文件
 	ofstream file(main_ini["result_txt"]);
@@ -2276,5 +2275,5 @@ int otsu(Mat im)
 				y = highThresh;
 			}
 		}
-	return y;
+	return 0.5*x+0.5*y;
 }

@@ -145,7 +145,7 @@ int GeoMatch::CreateGeoMatchModel(Mat &src,double maxContrast,double minContrast
 	max_value = 0;
 	for (int i = temp_value.size() - 1; i >= 0;--i) {
 		max_value = max_value + temp_value[i];
-		if (max_value > magMat.total()*0.1) {
+		if (max_value > magMat.total()*0.2) {
 			maxContrast = i/ MaxGradient*255;
 			minContrast = maxContrast *0.3;
 			break;
@@ -516,7 +516,7 @@ void GeoMatch::DrawContours(Mat &source,CvScalar color,int lineWidth)
 }
 
 
-bool geo_match(Mat temp1, Mat temp2, float & score, Mat & draw_image, Point & result,bool color_flag)
+bool geo_match(Mat temp1, Mat temp2, float & score, Mat & draw_image, Point & result, vector<double> roi,bool color_flag)
 {
 	score = -2;
 	GeoMatch GM;				// object to implent geometric matching	
@@ -573,6 +573,23 @@ bool geo_match(Mat temp1, Mat temp2, float & score, Mat & draw_image, Point & re
 	assist_score.colRange(0, 0.1*c).setTo(-2);
 	assist_score.colRange(0.9*c, c).setTo(-2);
 	assist_score.rowRange(0.5*r, r).setTo(-2);
+	//assist_score.setTo(1);
+	// 抑制部分，固定区域
+	if (roi.size() > 3) {
+		GM.color_flag = false;
+		roi[0] = roi[0] - draw_image.cols / 2;
+		roi[2] = roi[2] - draw_image.cols / 2;
+
+		roi[1] = roi[1] - draw_image.rows / 2;
+		roi[3] = roi[3] - draw_image.rows / 2;
+		for (int i = 0; i < 4; ++i) {
+			roi[i] = roi[i] >= 0 ? roi[i] : 0;
+		}
+		assist_score.colRange(0, roi[0]).setTo(-2);
+		assist_score.colRange(roi[2], assist_score.cols).setTo(-2);
+		assist_score.rowRange(0, roi[1]).setTo(-2);
+		assist_score.rowRange(roi[3], assist_score.rows).setTo(-2);
+	}
 
 
 	score = GM.FindGeoMatchModel(graySearchImg, minScore, greediness, result,assist_score);

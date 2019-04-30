@@ -30,17 +30,19 @@ struct xy_feature {
 	double dx;
 	double dy;
 };
+
 struct assist_information {
 	//
-	map<string, float> xy_param{
+	map<string, vector<double>> xy_param{
 		// 摄像头抖动
 		// 白天水位获取
-		{"score1_t1",0.8},
-		{"score1_t2",0.95},
-		{"score2_t1",0.6},
-		{"score2_t2",0.8},
-		{"score3_t1",0.3},
-		{"score3_t2",0.6}
+		{"score1_t1",vector<double>{0.8}},
+		{"score1_t2",vector<double>{0.95}},
+		{"score2_t1",vector<double>{0.6}},
+		{"score2_t2",vector<double>{0.8}},
+		{"score3_t1",vector<double>{0.3}},
+		{"score3_t2",vector<double>{0.6}},
+		{"roi",vector<double>{}}
 		// 夜晚水位获取
 	};
 	// 基本信息
@@ -96,7 +98,7 @@ vector<string> getFiles(string folder, string firstname, string lastname);
 bool input_assist(Mat im,map<string, string> main_ini, vector<assist_information> &assist_files);
 bool get_number(string line_string, vector<double> &temp);
 bool input_assist_image(string file_name,assist_information &assist_file);
-void upadate_param(vector<assist_information> &assist_files, map<string, string> main_ini);
+void upadate_param(assist_information &assist_files, map<string, string> main_ini);
 // 处理主函数
 
 void compute_water_area(Mat image, vector<assist_information> &assist_files,string ref_name);

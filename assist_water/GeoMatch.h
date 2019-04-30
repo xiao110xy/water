@@ -35,6 +35,7 @@ public:
 	~GeoMatch(void);
 
 
+
 	int CreateGeoMatchModel(Mat &src,double,double);
 	void MatchModelBetter(Mat &src);
 	double FindGeoMatchModel(Mat srcarr,double minScore,double greediness, Point &resultPoint,Mat assist_score);
@@ -42,4 +43,4 @@ public:
 	void DrawContours(Mat & source,CvScalar,int);
 	bool color_flag = true;
 };
-bool geo_match(Mat temp1, Mat temp2,float &score, Mat &draw_image, Point &result, bool color_flag = true);
+bool geo_match(Mat temp1, Mat temp2,float &score, Mat &draw_image, Point &result,vector<double> roi = vector<double>{ }, bool color_flag = true);
