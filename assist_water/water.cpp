@@ -653,8 +653,8 @@ bool correct_control_point(Mat im, assist_information & assist_file)
 	vector<vector<double>> temp_point;
 	vector<assist_registration> temp_assist_reg = xy_match(im, roi_image, dmatchs, assist_file.keypoints,keypoints_2,
 													model,1);
-	if(0){
- 	//if (temp_assist_reg.size() == 1) {
+	//if(0){
+ 	if (temp_assist_reg.size() == 1) {
 		homography = temp_assist_reg[0].homography.clone();
 		temp_point = temp_assist_reg[0].points;
 		match_line_image = temp_assist_reg[0].match_line_image;
@@ -1424,6 +1424,7 @@ int get_mask_line(Mat mask, int n_length,float scale,int class_n)
 }
 int get_water_line(assist_information &assist_file)
 {
+	bool left_e = assist_file.xy_param["left_e"][0] < 0.5;
 	Mat im = assist_file.wrap_image;
 	Mat ref_image = assist_file.ref_image;
 	//retinex_process(ref_image, ref_image);
@@ -1446,9 +1447,9 @@ int get_water_line(assist_information &assist_file)
 		int r1 = i * 5 * n;
 		int r2 = (i + 1) * 5 * n;
 
-		Mat temp1 = i % 2 == 0 ? im(Range(r1+ sum_d_r, r2+ sum_d_r), Range(0, c1)) :
+		Mat temp1 = i % 2 == left_e ? im(Range(r1+ sum_d_r, r2+ sum_d_r), Range(0, c1)) :
 			im(Range(r1+ sum_d_r, r2+ sum_d_r), Range(c1, c2));
-		Mat temp2 = i % 2 == 0 ? ref_image(Range(r1 + temp_step_r, r2 - temp_step_r), Range(0 + temp_step_c, c1 - temp_step_c)) :
+		Mat temp2 = i % 2 == left_e ? ref_image(Range(r1 + temp_step_r, r2 - temp_step_r), Range(0 + temp_step_c, c1 - temp_step_c)) :
 			ref_image(Range(r1 + temp_step_r, r2 - temp_step_r), Range(c1 + temp_step_c, c2 - temp_step_c));
 		//Mat temp3 = i % 2 == 0 ? im_s(Range(r1, r2), Range(0, c1)) :
 		//	im(Range(r1, r2), Range(c1, c2));
@@ -1490,9 +1491,9 @@ int get_water_line(assist_information &assist_file)
 		r2 = r2 <= im.rows - 1 ? r2 : im.rows - 1;
 		r1 = r1 < r2 ? r1 : r2;
 
-		Mat temp1 = score1.size() % 2 == 0 ? im(Range(r1, r2), Range(0, c1)) :
+		Mat temp1 = score1.size() % 2 == left_e ? im(Range(r1, r2), Range(0, c1)) :
 			im(Range(r1, r2), Range(c1, c2));
-		Mat temp2 = score1.size() % 2 == 0 ?
+		Mat temp2 = score1.size() % 2 == left_e ?
 			ref_image(Range(r1, r2), Range(0 + temp_step_c, c1 - temp_step_c)) :
 			ref_image(Range(r1, r2), Range(c1 + temp_step_c, c2 - temp_step_c));
 		Mat temp;
@@ -1519,10 +1520,10 @@ int get_water_line(assist_information &assist_file)
 			temp_score.push_back(0.3*max_score + 0.1);
 			break;
 		}
-		Mat temp1 = score1.size() % 2 == 0 ?
+		Mat temp1 = score1.size() % 2 == left_e ?
 			im(Range(r1, r2), Range(0, c1)) :
 			im(Range(r1, r2), Range(c1, c2));
-		Mat temp2 = score1.size() % 2 == 0 ?
+		Mat temp2 = score1.size() % 2 == left_e ?
 			ref_image(Range(r1, r2), Range(0 + temp_step_c, c1 - temp_step_c)) :
 			ref_image(Range(r1, r2), Range(c1 + temp_step_c, c2 - temp_step_c));
 		Mat temp;
@@ -1539,6 +1540,7 @@ int get_water_line(assist_information &assist_file)
 	// 后处理
 	score3 = process_score(temp_score, assist_file.xy_param["score3_t1"][0], assist_file.xy_param["score3_t2"][0]);
 	temp_score.clear();
+	
 	float water_number = length - 5 * score1.size() - score2.size() - score3.size() / 10.0;
 
 	return (1 - water_number / (double)length)*ref_image.rows;
@@ -1546,6 +1548,7 @@ int get_water_line(assist_information &assist_file)
 
 Mat getBinMaskByMask(Mat mask)
 {
+	
 	Mat binmask(mask.size(), CV_8U);
 	binmask = mask & GC_FGD;
 	binmask = binmask * 255;
@@ -1704,7 +1707,9 @@ float get_water_line_night(Mat im,assist_information & assist_file)
 	int gray_value = 230;
 	if (isTooHighLightInNight(splt[0], water_line, gray_value)) {
 		threshold(splt[0], temp, gray_value, 255, CV_THRESH_BINARY);
-		water_line = get_water_line_seg(temp.colRange(c, c * 2), assist_file.length, add_row);
+		int temp_water_line = get_water_line_seg(temp.colRange(c, c * 2), assist_file.length, add_row);
+		if (temp_water_line < water_line*1.05)
+			water_line = temp_water_line;
 	}
 
 	//temp = splt[0].rowRange(0, water_line).clone();
@@ -1770,6 +1775,8 @@ float get_water_line_night_local(Mat im, assist_information & assist_file)
 	int c = splt[0].cols / 3;
 	Mat temp,temp_im;
 	int n_length = 5 * (double)assist_file.base_image.rows / assist_file.length;
+	// 
+
 	// 
 	temp_im = splt[0].clone();
 	threshold(temp_im, temp, 0, 255, CV_THRESH_BINARY| CV_THRESH_OTSU);

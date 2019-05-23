@@ -1,6 +1,5 @@
 ﻿#include "stdafx.h"
 #include"sift.h"
-
 #include<string>
 #include<opencv2\core\core.hpp>//opencv基本数据结构
 #include<opencv2\highgui\highgui.hpp>//图像界面
@@ -45,9 +44,8 @@ void MySift::create_initial_image(const Mat &image, Mat &init_image) const
 		gray_image = image.clone();
 
 	//转换到0-1之间的浮点类型数据，方便接下来的处理
-	Mat floatImage;
-	//float_image=(float)gray_image*(1.0/255.0)
-	gray_image.convertTo(floatImage, CV_32FC1, 1.0 / 255.0, 0);
+	Mat floatImage,yx;
+	gray_image.convertTo(floatImage, CV_64FC1, 1.0 / 255.0, 0);
 	double sig_diff=0;
 	if (double_size){
 		Mat temp_image;
@@ -59,6 +57,7 @@ void MySift::create_initial_image(const Mat &image, Mat &init_image) const
 		GaussianBlur(temp_image, init_image, kernel_size, sig_diff, sig_diff);
 	}
 	else{
+
 		sig_diff = sqrt(sigma*sigma - 1.0*INIT_SIGMA*INIT_SIGMA);
 		//高斯滤波窗口大小选择很重要，这里选择(4*sig_diff_1+1)-(6*sig_diff+1)之间
 		int kernel_width = 2 * cvRound(GAUSS_KERNEL_RATIO * sig_diff) + 1;
@@ -152,6 +151,13 @@ void MySift::build_gaussian_pyramid(const Mat &init_image, vector<vector<Mat>> &
 				Size kernel_size(kernel_width, kernel_width);
 				GaussianBlur(gauss_pyramid[i][j - 1], gauss_pyramid[i][j], kernel_size, sig[j], sig[j]);
 			}
+		}
+	}
+	for (int i = 0; i < nOctaves; ++i)//对于每一组
+	{
+		for (int j = 0; j < gauss_pyramid[i].size(); ++j) {
+			Mat temp = gauss_pyramid[i][j];
+			temp.convertTo(gauss_pyramid[i][j], CV_32F);
 		}
 	}
 }
@@ -726,10 +732,8 @@ void MySift::detect(const Mat &image, vector<vector<Mat>> &gauss_pyr, vector<vec
 	//生成高斯金字塔第一层图像
 	Mat init_gauss;
 	create_initial_image(image, init_gauss);
-
 	//生成高斯尺度空间图像
 	build_gaussian_pyramid(init_gauss, gauss_pyr, nOctaves);
-
 	//生成高斯差分金字塔(DOG金字塔，or LOG金字塔)
 	build_dog_pyramid(dog_pyr, gauss_pyr);
 

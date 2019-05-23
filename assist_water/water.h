@@ -42,7 +42,8 @@ struct assist_information {
 		{"score2_t2",vector<double>{0.8}},
 		{"score3_t1",vector<double>{0.3}},
 		{"score3_t2",vector<double>{0.6}},
-		{"roi",vector<double>{}}
+		{"roi",vector<double>{}},
+		{"left_e",vector<double>{1}}
 		// 夜晚水位获取
 	};
 	// 基本信息

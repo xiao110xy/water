@@ -23,7 +23,7 @@
     <ProjectGuid>{8B50E1EE-5563-40BE-A809-9E23ADF5C552}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>assistwater</RootNamespace>
-    <WindowsTargetPlatformVersion>7.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>6.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
@@ -185,6 +185,7 @@
       <AssemblyDebug>
       </AssemblyDebug>
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
+      <LargeAddressAware>true</LargeAddressAware>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
