@@ -417,10 +417,10 @@ bool isgrayscale(Mat im)
 			int score = abs((data[i])[0] - (data[i])[1]);
 			score += abs((data[i])[1] - (data[i])[2]);
 			score += abs((data[i])[0] - (data[i])[2]);
-			if (score <20)
+			if (score <10)
 				++num;
 		}
-		if (num / temp.total() < 0.8) {
+		if (num / temp.total() < 0.9) {
 			return false;
 		}
 		else {
@@ -579,7 +579,7 @@ bool water_line_isok(int water_line, int all_length, int n_length)
 	return true;
 }
 
-bool isTooHighLightInNight(Mat im, int &water_line, int &gray_value)
+bool isTooHighLightInNight(Mat im, int &water_line, int &gray_value,int gray_value_t)
 {
 	int c = im.cols / 3;
 	float n = 0;
@@ -588,30 +588,35 @@ bool isTooHighLightInNight(Mat im, int &water_line, int &gray_value)
 		temp_water_line = im.rows-1;
 	for(int i = 0;i< temp_water_line;++i)
 		for (int j = c; j < 2 * c; ++j) {
-			if (im.at<uchar>(i, j) > gray_value) {
+			if (im.at<uchar>(i, j) > gray_value_t) {
 				++n;
 			}
 		}
 	n = n / c / temp_water_line;
-	if (n < 0.4)
+	if (n < 0.2)
 		return false;
 	Mat temp = im(Range(0, temp_water_line), Range(c, c * 2));
 	gray_value = otsu(temp);
-	if (gray_value > 230)
-		gray_value = 230;
-	int num = 0;
-	int temp_n = 0;
-	for (int i = 0; i < temp.total(); ++i) {
-		if (*(temp.ptr<uchar>(0) + i) > gray_value) {
-			num += *(temp.ptr<uchar>(0) + i);
-			++temp_n;
+	if (gray_value > gray_value_t)
+		gray_value = gray_value_t;
+	n = 2;
+	while (n) {
+		int num = 0;
+		int temp_n = 0;
+		for (int i = 0; i < temp.total(); ++i) {
+			if (*(temp.ptr<uchar>(0) + i) > gray_value) {
+				num += *(temp.ptr<uchar>(0) + i);
+				++temp_n;
+			}
 		}
+		if (temp_n < 1)
+			break;
+		gray_value = num / temp_n - 1;
+		n--;
 	}
-	if (temp_n < 1)
-		return false;
-	gray_value = num / temp_n -1;
-	if (gray_value >= 230) {
-		gray_value = 230;
+
+	if (gray_value >= gray_value_t) {
+		gray_value = gray_value_t;
 		return true;
 	}
 	else {
@@ -652,8 +657,8 @@ bool correct_control_point(Mat im, assist_information & assist_file)
 	Mat homography, match_line_image;
 	vector<vector<double>> temp_point;
 	vector<assist_registration> temp_assist_reg = xy_match(im, roi_image, dmatchs, assist_file.keypoints,keypoints_2,
-													model,1);
-	//if(0){
+													model,1, assist_file.xy_param["roi"]);
+	//if (0){
  	if (temp_assist_reg.size() == 1) {
 		homography = temp_assist_reg[0].homography.clone();
 		temp_point = temp_assist_reg[0].points;
@@ -762,8 +767,20 @@ bool correct_control_point(Mat im, assist_information & assist_file)
 	return true;
 
 }
-vector<assist_registration> xy_match(const Mat & image_1, const Mat & image_2,  vector<vector<DMatch>>& dmatchs, vector<KeyPoint> keys_1, vector<KeyPoint> keys_2, string model, int  ruler_number)
+vector<assist_registration> xy_match(const Mat & image_1, const Mat & image_2,  vector<vector<DMatch>>& dmatchs, vector<KeyPoint> keys_1, vector<KeyPoint> keys_2, string model, int  ruler_number,vector<double> roi)
 {
+	//约束
+	if (roi.size() > 3) {
+		roi[0] = roi[0] - image_2.cols ;
+		roi[2] = roi[2] + image_2.cols ;
+
+		roi[1] = roi[1] - image_2.rows ;
+		roi[3] = roi[3] + image_2.rows ;
+		for (int i = 0; i < 4; ++i) {
+			roi[i] = roi[i] >= 0 ? roi[i] : 0;
+		}
+
+	}
 	//获取初始匹配的关键点的位置
 	vector<Point2f> point_1, point_2;
 	vector<DMatch> data_dmatchs, temp_dmatchs;
@@ -772,6 +789,13 @@ vector<assist_registration> xy_match(const Mat & image_1, const Mat & image_2,  
 	{
 		double dis_1 = dmatchs[i][0].distance;
 		double dis_2 = dmatchs[i][1].distance;
+		if (roi.size() > 3) {
+			double x = keys_1[dmatchs[i][0].queryIdx].pt.x;
+			double y = keys_1[dmatchs[i][0].queryIdx].pt.y;
+			if (x<roi[0] || x>roi[2] || y<roi[1] || y>roi[3])
+				continue;
+		}
+
 		if ((dis_1 / dis_2) <0.8)//如果满足距离比关系
 		{
 			data_dmatchs.push_back(dmatchs[i][0]);//保存正确的dmatchs
@@ -779,6 +803,7 @@ vector<assist_registration> xy_match(const Mat & image_1, const Mat & image_2,  
 		}
 	}
 	drawMatches(image_1, keys_1, image_2, keys_2, data_dmatchs, matched_line, Scalar(0, 255, 0), Scalar(255, 0, 0), vector<char>(), 2);
+
 
 	vector<assist_registration> result;
 	for (int i = 0; i < ruler_number; ++i) {
@@ -1261,6 +1286,8 @@ vector<float> process_score(vector<float> temp_score, float score_t1, float scor
 		//	max_score = max_score > 0.8 ? max_score : 0.8;
 		//}
 		if (temp_score[i] < score_t1*max_score) {
+			if (i + 1 == temp_score.size())
+				break;
 			if (i == 0 &&temp_score[i + 1] > score_t1*max_score)
 				continue;
 			if (i == 0 || i == temp_score.size() - 1) {
@@ -1705,7 +1732,7 @@ float get_water_line_night(Mat im,assist_information & assist_file)
 	if (water_line < 0)
 		return water_line;
 	int gray_value = 230;
-	if (isTooHighLightInNight(splt[0], water_line, gray_value)) {
+	if (isTooHighLightInNight(splt[0], water_line, gray_value,assist_file.xy_param["gray_value"][0])) {
 		threshold(splt[0], temp, gray_value, 255, CV_THRESH_BINARY);
 		int temp_water_line = get_water_line_seg(temp.colRange(c, c * 2), assist_file.length, add_row);
 		if (temp_water_line < water_line*1.05)

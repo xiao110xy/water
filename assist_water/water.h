@@ -43,7 +43,8 @@ struct assist_information {
 		{"score3_t1",vector<double>{0.3}},
 		{"score3_t2",vector<double>{0.6}},
 		{"roi",vector<double>{}},
-		{"left_e",vector<double>{1}}
+		{"left_e",vector<double>{1}},
+		{"gray_value",vector<double>{230}}
 		// 夜晚水位获取
 	};
 	// 基本信息
@@ -113,11 +114,11 @@ bool notall(Mat im, assist_information &assist_file);
 // 判断water_line 是否可信
 bool water_line_isok(int water_line, int all_length, int n_length);
 // 夜晚是否过亮 并优化
-bool isTooHighLightInNight(Mat im,int &water_line,int &gray_value);
+bool isTooHighLightInNight(Mat im,int &water_line,int &gray_value, int gray_value_t);
 // 对原始影像进行配准
 bool correct_control_point(Mat im, assist_information &assist_file);
 vector<assist_registration> xy_match(const Mat &image_1, const Mat &image_2, vector<vector<DMatch>> &dmatchs, vector<KeyPoint> keys_1,
-	vector<KeyPoint> keys_2, string model,int  ruler_number);
+	vector<KeyPoint> keys_2, string model,int  ruler_number, vector<double> roi);
 
 void GetImageThreshold(Mat im, int &bestLowThresh, int& bestHighThresh);
 
