@@ -1,5 +1,6 @@
 ﻿#pragma once
 #define GET_VARIABLE_NAME(Variable) (#Variable)
+#include "xy_torch.h"
 #include <iostream>
 #include <algorithm>
 #include <vector> 
@@ -14,6 +15,15 @@
 #include "retinex.h"
 #include "lsd.h"
 #include "GeoMatch.h"
+using namespace std;
+#include "opencv2/highgui/highgui.hpp"
+#include "opencv2/imgproc/imgproc.hpp"  
+#include "opencv2/core/core.hpp"
+#include "opencv2/features2d/features2d.hpp"  
+#include "opencv2/objdetect/objdetect.hpp"
+using namespace cv;
+
+
 #define match_t 0.5
 static 
 
@@ -44,9 +54,14 @@ struct assist_information {
 		{"score3_t2",vector<double>{0.6}},
 		{"roi",vector<double>{}},
 		{"left_e",vector<double>{1}},
-		{"gray_value",vector<double>{230}}
+		{"gray_value_t1",vector<double>{230}},
+		{"gray_value_t2",vector<double>{180}},
+		{"gray_value_t",vector<double>{30}},
+		{"otsu_high",vector<double>{1}},
+		{"water_reflection",vector<double>{0}},
 		// 夜晚水位获取
 	};
+
 	// 基本信息
 	Mat base_image;
 	Mat wrap_image;
@@ -59,6 +74,7 @@ struct assist_information {
 	// roi 
 	Mat assist_image;
 	vector<double> roi;
+	vector<double> new_roi;
 	vector<double> sub_roi;
 	int roi_order = 1;
 	// 摄像头抖动
@@ -74,6 +90,7 @@ struct assist_information {
 	Mat r_inv;
 	double rms_1, rms_2;
 	Mat mask;
+	Vec4f line_para;
 	//ref
 	int ref_index;
 	Mat ref_image;
@@ -81,6 +98,7 @@ struct assist_information {
 	bool left_right_no_water;
 	// 分割水位线
 	Mat segment_result;
+	Mat segment_wrap_image;
 	Mat left_image;
 	Mat right_image;
 	Mat expand_wrap_image;
@@ -103,7 +121,8 @@ bool input_assist_image(string file_name,assist_information &assist_file);
 void upadate_param(assist_information &assist_files, map<string, string> main_ini);
 // 处理主函数
 
-void compute_water_area(Mat image, vector<assist_information> &assist_files,string ref_name);
+void compute_water_area(Mat image, vector<assist_information> &assist_files, map<string, string> main_ini);
+//优化
 void opt_assist_files(vector<assist_information> &assist_files);
 // 判断是白天还是黑夜
 bool isgrayscale(Mat im);
@@ -131,7 +150,7 @@ double compute_rms(Mat base_point, Mat wrap_point, Mat r);
 // 水位线识别
 bool get_label_mask(Mat mask,int &label, Mat &label_mask, double,int y_t);
 float match_template_score(Mat temp1, Mat temp2);
-vector<float> process_score(vector<float> score, float score_t1, float score_t2);
+vector<float> process_score(vector<float> score, float score_t1, float score_t2, bool water_reflection= false);
 
 // 白天水位线
 float get_water_line_day(Mat gc_im, assist_information &assist_file, int water_line, float scale = 0.4);
@@ -149,6 +168,7 @@ float get_water_line_night(Mat im,assist_information &assist_file);
 float get_water_line_night_local(Mat im,assist_information &assist_file);
 bool left_right_water(Mat gc_im,int length);
 int get_water_line_seg(Mat im, int length, int add_rows = 100, float scale = 0.2);
+
 // 结果保存
 void save_file(Mat im, vector<assist_information> assist_files,map<string,string> main_ini);
 // 功能函数
@@ -157,6 +177,6 @@ vector<vector<double>> part_col_point(vector<vector<double>> point,int c1,int c2
 vector<vector<double>> swap_point(vector<vector<double>> &data);
 Mat vector2Mat(vector<vector<double>> data);
 vector<vector<double>> Mat2vector(Mat data);
-int otsu(Mat im);
+int otsu(Mat im,bool flag = true);
 
 

@@ -1,6 +1,6 @@
-﻿
-#include "stdafx.h"
-#include "water.h"
+﻿#include "water.h"
+
+
 #define no_water_flag false
 #define night_way true
 vector<string> getFiles(string folder, string firstname, string lastname)
@@ -61,6 +61,7 @@ bool input_assist(Mat im,map<string, string> main_ini, vector<assist_information
 	vector<double> temp;
 	get_number(temp_name, temp);
 	int ruler_number = temp[0];
+
 	while (!assist_file_name.eof())
 	{
 		temp.clear();
@@ -87,8 +88,10 @@ bool input_assist(Mat im,map<string, string> main_ini, vector<assist_information
 		string temp_name = string(main_ini["template"].begin(), main_ini["template"].end() - 4) 
 				+ "_" + to_string((int)temp[2]) + string(main_ini["template"].end() - 4, main_ini["template"].end());
 		Mat template_image = imread(temp_name, IMREAD_GRAYSCALE);
-		if (!template_image.data)
+		if (!template_image.data) {
+			cout << "template image error!" << endl;
 			return false;
+		}
 		temp_assist_file.base_image = template_image;
 		temp_assist_file.length = temp[2];
 		// roi
@@ -268,10 +271,19 @@ void upadate_param(assist_information& assist_file, map<string, string> main_ini
 		}
 	}
 }
-void compute_water_area(Mat image, vector<assist_information> &assist_files, string ref_name)
+void compute_water_area(Mat image, vector<assist_information> &assist_files, map<string, string> main_ini)
 {
+	Mat mask = Mat::zeros(image.size(), CV_8UC1) + 50;
+	std::ifstream fin(main_ini["deep_model"]);
+	bool model_flag = false;
+#if defined(_WIN64)
+	xy_torch my_torch;
+	bool flag = my_torch.load_model(main_ini["deep_model"]);
+	if (flag == true)
+		model_flag = true;
+#endif
+	string ref_name = main_ini["ref"];
 	for (auto &assist_file : assist_files) {
-		Mat im = image.clone();
 		// 延伸一部分水尺区域
 		int add_row =  10.0*assist_file.base_image.rows / assist_file.length;
 		// 旋转校正 少部分 包含对原始影像进行矫正
@@ -279,58 +291,91 @@ void compute_water_area(Mat image, vector<assist_information> &assist_files, str
 			add_row + assist_file.base_image.rows), CV_64F);
 		assist_file.correct2poly = true;
 		assist_file.add_row = add_row;
-		Mat image_rotate = correct_image(im, assist_file);
+		Mat image_rotate = correct_image(image, assist_file);
 		
 		//判断是否为无图像区域
 		//  判断是否全是水
-		if (isblank(im, assist_file)) {
+		if (isblank(image, assist_file)) {
 			assist_file.parrallel_left.clear();
 			assist_file.parrallel_right.clear();
 			assist_file.parrallel_lines.clear();
+			cout << "there is no water gauge!" << endl;
 			continue;
 		}
 
 		double water_line = 0;
 		int n_length = 7.0*assist_file.base_image.rows / assist_file.length;
-		if (!isgrayscale(im)) {
-			// 获得水位线,两种方式选择
-			string temp_ref(ref_name.begin(), ref_name.end() - 4);
-			vector<int> water_lines;
-			string temp = temp_ref + "_" + to_string(assist_file.ref_index) + string(ref_name.end() - 4, ref_name.end());;
-			assist_file.ref_image = imread(temp);
-			if (assist_file.ref_image.data)
-				water_lines.push_back(get_water_line(assist_file));
-			else {
-				for (int i = 0;; ++i) {
-					temp = temp_ref + "_" + to_string(assist_file.ref_index) + "_" + to_string(i + 1) + string(ref_name.end() - 4, ref_name.end());
-					assist_file.ref_image = imread(temp);// 历史参考数据
-					if (!assist_file.ref_image.data)
-						break;
-					else
-						water_lines.push_back(get_water_line(assist_file));
-				}
-			}
+		if (model_flag) {
+#if defined(_WIN64)
 
-			for (int i = 0; i < water_lines.size(); ++i) {
-				if (water_lines[i] > water_line)
-					water_line = water_lines[i];
+
+
+			int min_x = assist_file.new_roi[0] >= 0 ? assist_file.new_roi[0]: 0;
+			int min_y = assist_file.new_roi[1] >= 0 ? assist_file.new_roi[1] : 0;
+			int max_x = assist_file.new_roi[2] <= image.cols ? assist_file.new_roi[2] : image.cols;
+			int max_y = assist_file.new_roi[3] <= image.rows ? assist_file.new_roi[3] : image.rows;
+			Mat temp_im = image(Range(min_y, max_y), Range(min_x, max_x));
+			if (!temp_im.data) {
+				cout << "deep model roi error!" << endl;
+				goto Deep_model_error;
 			}
-			//Mat gc_im = assist_file.expand_wrap_image.clone();
-			//water_line = get_water_line_day(gc_im, assist_file, water_line);
-			
+			cout << "deep model is using" << endl;
+			Mat result = my_torch.process_image(temp_im);
+			for (int i= min_y;i< max_y;++i)
+				for (int j = min_x; j < max_x; ++j) {
+					if (result.at<uchar>(i - min_y, j - min_x) > 100)
+						mask.at<uchar>(i, j) = 255;
+				}
+			assist_information temp_assist_file = assist_file;
+			Mat im_rotate = correct_image(mask, temp_assist_file);
+			int n_length = 3 * (double)assist_file.base_image.rows / assist_file.length;
+			int c = assist_file.expand_wrap_image.cols / 3;
+			water_line = get_water_line_seg(im_rotate, assist_file.length, add_row);
+#endif
 		}
 		else {
-			if (im.channels() == 3)
-				cvtColor(im, im, CV_BGR2GRAY);
-			if (night_way)
-				water_line = get_water_line_night(im, assist_file);
-			else
-				water_line = get_water_line_night_local(im, assist_file);
+Deep_model_error: if (!isgrayscale(image)) {
+				// 获得水位线,两种方式选择
+				string temp_ref(ref_name.begin(), ref_name.end() - 4);
+				vector<int> water_lines;
+				string temp = temp_ref + "_" + to_string(assist_file.ref_index) + string(ref_name.end() - 4, ref_name.end());;
+				assist_file.ref_image = imread(temp);
+				if (assist_file.ref_image.data)
+					water_lines.push_back(get_water_line(assist_file));
+				else {
+					for (int i = 0;; ++i) {
+						temp = temp_ref + "_" + to_string(assist_file.ref_index) + "_" + to_string(i + 1) + string(ref_name.end() - 4, ref_name.end());
+						assist_file.ref_image = imread(temp);// 历史参考数据
+						if (!assist_file.ref_image.data)
+							break;
+						else
+							water_lines.push_back(get_water_line(assist_file));
+					}
+				}
+
+				for (int i = 0; i < water_lines.size(); ++i) {
+					if (water_lines[i] > water_line)
+						water_line = water_lines[i];
+				}
+			}
+			else {
+				Mat im = image.clone();
+				if (im.channels() == 3)
+					cvtColor(im, im, CV_BGR2GRAY);
+				if (night_way)
+					water_line = get_water_line_night(im, assist_file);
+				else
+					water_line = get_water_line_night_local(im, assist_file);
+			}
+
 		}
+
+
 		if (water_line < 0) {
 			assist_file.parrallel_left.clear();
 			assist_file.parrallel_right.clear();
 			assist_file.parrallel_lines.clear();
+			cout << "processing and no water_line" << endl;
 			continue;
 		}
 		if (water_line > assist_file.base_image.rows - 1.5*assist_file.base_image.rows / assist_file.length) {
@@ -412,21 +457,22 @@ bool isgrayscale(Mat im)
 	if (temp.channels() == 3) {
 		temp.convertTo(temp, CV_8UC3);
 		cv::Vec3b * data = temp.ptr<cv::Vec3b>(0);
-		float num = 0;
+		float num1 = 0,num2=0;
 		for (int i = 0; i < temp.total(); ++i) {
 			int score = abs((data[i])[0] - (data[i])[1]);
 			score += abs((data[i])[1] - (data[i])[2]);
 			score += abs((data[i])[0] - (data[i])[2]);
 			if (score <10)
-				++num;
+				++num1;
+			if (score < 3)
+				++num2;
 		}
-		if (num / temp.total() < 0.9) {
+		if (num1 / temp.total() < 0.98)
 			return false;
-		}
-		else {
-			return true;
-		}
-		return false;
+		if (num2 / temp.total() < 0.95)
+			return false;
+
+		return true;
 	}
 	else {
 		return true;
@@ -485,6 +531,19 @@ bool isblank(Mat im, assist_information &assist_file)
 		}
 		Mat image_rotate = correct_image(im, temp_assist_file);
 		assist_file.expand_wrap_image = image_rotate.clone();
+		Mat temp;
+		cvtColor(im, temp, CV_BGR2GRAY);
+
+		if (assist_file.xy_param["otsu_high"][0] > 0.5) {
+			int temp_t;
+			temp_t = otsu(im);
+			threshold(temp, temp, temp_t, 255, CV_THRESH_BINARY);
+		}
+		else
+			threshold(temp, temp, 1, 255, CV_THRESH_BINARY | CV_THRESH_OTSU);
+		assist_file.segment_result = temp.clone();
+		temp = correct_image(temp, temp_assist_file);
+		assist_file.segment_wrap_image = temp.clone();
 	}
 	Mat left_image = image_rotate.colRange(0, assist_file.base_image.cols).clone();
 	Mat base_image = image_rotate.colRange(assist_file.base_image.cols, assist_file.base_image.cols * 2).clone();
@@ -499,9 +558,9 @@ bool isblank(Mat im, assist_information &assist_file)
 		Mat temp3 = right_image.rowRange(0, n_length).clone();
 		float score1, score2;
 		Mat temp;
-		matchTemplate(temp1, temp2, temp, CV_TM_SQDIFF_NORMED);
+		matchTemplate(temp1, temp2, temp, CV_TM_SQDIFF);
 		score1 = temp.at<float>(0, 0);
-		matchTemplate(temp1, temp3, temp, CV_TM_SQDIFF_NORMED);
+		matchTemplate(temp1, temp3, temp, CV_TM_SQDIFF);
 		score2 = temp.at<float>(0, 0);
 		if (score1 < 0.05 && score2 < 0.05)
 			return true;
@@ -530,8 +589,17 @@ bool isblank(Mat im, assist_information &assist_file)
 		score1 = temp.at<float>(0, 0);
 		matchTemplate(temp1, temp3, temp, CV_TM_SQDIFF_NORMED);
 		score2 = temp.at<float>(0, 0);
-		if (score1 < 0.15 && score2 < 0.15)
-			return true;
+		if (score1 < 0.1 && score2 < 0.1) {
+
+			float matMean1 = mean(temp1).val[0];
+			float matMean2 = mean(temp2).val[0];
+			float matMean3 = mean(temp3).val[0];
+			if (abs(matMean1 - matMean2) < 5 && abs(matMean1 - matMean3) < 5)
+				return true;
+			else
+				return false;
+		}
+			
 
 	}
 
@@ -597,9 +665,7 @@ bool isTooHighLightInNight(Mat im, int &water_line, int &gray_value,int gray_val
 		return false;
 	Mat temp = im(Range(0, temp_water_line), Range(c, c * 2));
 	gray_value = otsu(temp);
-	if (gray_value > gray_value_t)
-		gray_value = gray_value_t;
-	n = 2;
+	n = 1;
 	while (n) {
 		int num = 0;
 		int temp_n = 0;
@@ -612,11 +678,14 @@ bool isTooHighLightInNight(Mat im, int &water_line, int &gray_value,int gray_val
 		if (temp_n < 1)
 			break;
 		gray_value = num / temp_n - 1;
+		//if (gray_value < gray_value_t-20&&n==1)
+		//	break;
 		n--;
 	}
 
 	if (gray_value >= gray_value_t) {
-		gray_value = gray_value_t;
+		if (gray_value > 250)
+			gray_value = 250;
 		return true;
 	}
 	else {
@@ -626,6 +695,9 @@ bool isTooHighLightInNight(Mat im, int &water_line, int &gray_value,int gray_val
 
 bool correct_control_point(Mat im, assist_information & assist_file)
 {
+	assist_file.new_roi = assist_file.roi;
+	assist_file.new_roi[2] += assist_file.roi[0];
+	assist_file.new_roi[3] += assist_file.roi[1];
 	string model = "similarity";
 	// 将原始影像进行校正
 	if (isgrayscale(im)^isgrayscale(assist_file.assist_image))
@@ -733,10 +805,23 @@ bool correct_control_point(Mat im, assist_information & assist_file)
 			point[3] = x * homography.at<float>(1, 0) + y * homography.at<float>(1, 1) + homography.at<float>(1, 2);
 		}
 		assist_file.point = points;
+
 	}
+	// 新roi
+	double x, y;
+	x = assist_file.roi[0] - assist_file.sub_roi[0];
+	y = assist_file.roi[1] - assist_file.sub_roi[1];
+	assist_file.new_roi[0] = x * homography.at<float>(0, 0) + y * homography.at<float>(0, 1) + homography.at<float>(0, 2);
+	assist_file.new_roi[1] = x * homography.at<float>(1, 0) + y * homography.at<float>(1, 1) + homography.at<float>(1, 2);
+	x = assist_file.roi[0] + assist_file.roi[2] - assist_file.sub_roi[0];
+	y = assist_file.roi[1] + assist_file.roi[3] - assist_file.sub_roi[1];
+	assist_file.new_roi[2] = x * homography.at<float>(0, 0) + y * homography.at<float>(0, 1) + homography.at<float>(0, 2);
+	assist_file.new_roi[3] = x * homography.at<float>(1, 0) + y * homography.at<float>(1, 1) + homography.at<float>(1, 2);
 	// 判断在尺子内的个数
 	if (temp_point.size() == 0)
 		return false;
+
+
 	// 保存
 	assist_file.temp_correct_point = temp_point;
 	//
@@ -771,11 +856,13 @@ vector<assist_registration> xy_match(const Mat & image_1, const Mat & image_2,  
 {
 	//约束
 	if (roi.size() > 3) {
-		roi[0] = roi[0] - image_2.cols ;
-		roi[2] = roi[2] + image_2.cols ;
+		int x = (roi[0] + roi[2]) / 2;
+		int y = (roi[1] + roi[3]) / 2;
+		roi[0] = x - image_2.cols/2 ;
+		roi[2] = x + image_2.cols/2 ;
 
-		roi[1] = roi[1] - image_2.rows ;
-		roi[3] = roi[3] + image_2.rows ;
+		roi[1] = y - image_2.rows;
+		roi[3] = y + image_2.rows;
 		for (int i = 0; i < 4; ++i) {
 			roi[i] = roi[i] >= 0 ? roi[i] : 0;
 		}
@@ -1001,6 +1088,7 @@ Mat correct_image(Mat im, assist_information &assist_file)
 		assist_file.parrallel_left.push_back(points[i]);
 	}
 	fitLine(points, line_para, CV_DIST_FAIR, 0, 1e-2, 1e-2);
+	assist_file.line_para = line_para;
 	point1.y = 9999; point2.y = -9999;
 	for (auto i : points) {
 		float d = (i.x - line_para[2])*line_para[0] + (i.y - line_para[3])*line_para[1];
@@ -1257,7 +1345,7 @@ float match_template_score(Mat temp1, Mat temp2)
 }
 
 
-vector<float> process_score(vector<float> temp_score, float score_t1, float score_t2)
+vector<float> process_score(vector<float> temp_score, float score_t1, float score_t2, bool water_reflection)
 {
 	int n = 0;
 	for (int i = temp_score.size(); i >0; --i) {
@@ -1267,8 +1355,9 @@ vector<float> process_score(vector<float> temp_score, float score_t1, float scor
 		}
 	}
 	vector<bool> temp_flag(temp_score.size(), true);
-	for (int i = n; i < temp_score.size(); ++i) {
-		float max_score = 1;
+	int temp_n = 0;
+ 	for (int i = n; i < temp_score.size(); ++i) {
+		float max_score = 1; 
 		//if (i >= 4) {
 		//	int temp_n = 0;
 		//	max_score = 0;
@@ -1277,7 +1366,6 @@ vector<float> process_score(vector<float> temp_score, float score_t1, float scor
 		//			max_score += temp_score[i - 1 - j];
 		//			temp_n++;
 		//		}
-
 		//	}
 		//	if (temp_n == 0)
 		//		max_score = 1;
@@ -1298,8 +1386,25 @@ vector<float> process_score(vector<float> temp_score, float score_t1, float scor
 				temp_score.erase(temp_score.begin() + i, temp_score.end());
 				break;
 			}
-			temp_flag[i] = false;
+			temp_n = i;
 		}
+	}
+	if (water_reflection) {
+		bool flag1 = (temp_score.size() - temp_n - 1) <= 3;
+		double mean_value1 = 0,mean_value2=0;
+		for (int i = 0; i < temp_n; ++i) {
+			mean_value1 += temp_score[i];
+		}
+		mean_value1 /= temp_n + 1;
+		for (int i = temp_n+1; i < temp_score.size(); ++i) {
+			mean_value2 += temp_score[i];
+		}
+		mean_value2 /= temp_score.size()-temp_n - 1;
+		bool flag2 = false;
+		if ((mean_value1 - mean_value2) > 0.02)
+			flag2 = true;
+		if (flag1&&flag2)
+			temp_score.erase(temp_score.begin() + temp_n, temp_score.end());
 	}
 	return temp_score;
 }
@@ -1506,7 +1611,7 @@ int get_water_line(assist_information &assist_file)
 	}
 	scores.push_back(temp_score);
 	// 后处理
-	score1 = process_score(temp_score , assist_file.xy_param["score1_t1"][0],assist_file.xy_param["score1_t2"][0]);
+	score1 = process_score(temp_score , assist_file.xy_param["score1_t1"][0],assist_file.xy_param["score1_t2"][0],assist_file.xy_param["water_reflection"][0]>0.5);
 	if (score1.size() == (length / 5))
 		return im.rows + 2;
 	temp_score.clear();
@@ -1713,84 +1818,184 @@ Mat draw_line(Mat data, vector<vector<float>> lines, int base_x, vector<uchar> r
 
 float get_water_line_night(Mat im,assist_information & assist_file)
 {
+	bool too_high_ligth = false;
 	int water_line = -1;
 	int add_row = assist_file.add_row;
-
 	vector<Mat> splt;
 	split(assist_file.expand_wrap_image, splt);
 	int n_length = 3 * (double)assist_file.base_image.rows / assist_file.length;
 	int c = assist_file.expand_wrap_image.cols / 3;
-	//
+	int temp_t =0;
+	Mat temp_im;
+	// 得到初步结果 得到初步的水位线
 	Mat temp = splt[0].rowRange(add_row, splt[0].rows).clone();
-	int temp_t = otsu(splt[0].colRange(c, c * 2));
-	threshold(temp, temp, temp_t, 255, CV_THRESH_BINARY);
+	temp_t = otsu(temp);
+	threshold(temp, temp, temp_t, 255, CV_THRESH_BINARY | CV_THRESH_OTSU);
+	//threshold(temp, temp, temp_t, 255, CV_THRESH_BINARY);
 	water_line = get_water_line_seg(temp.colRange(c, c * 2), assist_file.length, add_row);
-	//
 	assist_file.expand_wrap_image = assist_file.expand_wrap_image.rowRange(add_row, assist_file.expand_wrap_image.rows).clone();
 	split(assist_file.expand_wrap_image, splt);
-	//
+	temp = temp.rowRange(add_row, temp.rows);
 	if (water_line < 0)
 		return water_line;
-	int gray_value = 230;
-	if (isTooHighLightInNight(splt[0], water_line, gray_value,assist_file.xy_param["gray_value"][0])) {
-		threshold(splt[0], temp, gray_value, 255, CV_THRESH_BINARY);
-		int temp_water_line = get_water_line_seg(temp.colRange(c, c * 2), assist_file.length, add_row);
-		if (temp_water_line < water_line*1.05)
-			water_line = temp_water_line;
+	if (water_line < 2 * n_length)
+		return water_line;
+	// 判断是否过亮
+	// 判断水尺区域
+	if (!assist_file.left_right_no_water) {
+		temp_im = splt[0].rowRange(0, water_line).clone();
+		temp_im = temp_im.colRange(0, 3 * c).clone();
 	}
-
-	//temp = splt[0].rowRange(0, water_line).clone();
-	//temp_t = otsu(temp);
-	//threshold(temp, temp, temp_t, 255, CV_THRESH_BINARY);
-
-	if (assist_file.left_right_no_water) {
-		Mat result;
-		temp = splt[0].clone();
-		hconcat(temp.colRange(0.5,0.75*c), temp.colRange(c*2.25, c*2.5), result);
-		while (1) {
-			if (water_line >= assist_file.base_image.rows)
-				return water_line;
-			if (water_line < 2 * n_length)
-				return water_line;
-			temp = result.rowRange(water_line - 2 * n_length, water_line + add_row).clone();
-			int temp_t = otsu(temp);
-			threshold(temp, temp, temp_t, 255, CV_THRESH_BINARY);
-			//
-			vector<double> im_score(temp.rows, 0);
-			for (int i = 0; i < temp.rows; ++i) {
-				int n = 0;
-				for (int j = 0; j < temp.cols; ++j) {
-					if (temp.at<uchar>(i, j) > 100)
-						++n;
-				}
-				im_score[i] = n;
-			}
-			//
-			int water_line2 = 0;
-			int temp_n = 0;
-			for (int i = 0; i < temp.rows; ++i) {
-				if (im_score[i] > 0.6*temp.cols)
-					++water_line2;
-				else {
-					++temp_n;
-				}
-				if (temp_n > 6)
-					break;
-			}
-			if (temp_n <= 0) {
-				water_line = water_line - 2 * n_length;
+	else {
+		hconcat(splt[0].colRange(0, 0.5*c), splt[0].colRange(c * 2.5, c * 3), temp_im);
+		temp_im = temp_im.rowRange(0, water_line).clone();
+	}
+	temp_t = otsu(temp_im);
+	threshold(splt[0], temp, temp_t, 255, CV_THRESH_BINARY);
+	int temp_n1 = 0, temp_n2 = 0;
+	double gray_value1 = 0, gray_value2 = 0;
+	for (int i = 0; i < 3 * c; ++i)
+		for (int j = 0; j < water_line; ++j) {
+			if (!assist_file.left_right_no_water) {
+				if (i < c || i >= 2 * c)
+					continue;
 			}
 			else {
-				water_line = water_line - 2 * n_length + water_line2;
-				break;
+				if (i >= c && i < 2 * c)
+					continue;
+			}
+			if (temp.at<uchar>(j, i) > 100) {
+				gray_value1 += splt[0].at<uchar>(j, i);
+				temp_n1++;
+			}
+			else {
+				gray_value2 += splt[0].at<uchar>(j, i);
+				temp_n2++;
 			}
 
+		}
+	gray_value1 = gray_value1 / temp_n1;
+	gray_value2 = gray_value2 / temp_n2;
+	int temp_gray_value = (gray_value1*temp_n1 + gray_value2 * temp_n2) / (temp_n1 + temp_n2);
+	// 判断整体区域
+	double gray_value3 = 0, gray_value4 = 0;
+	int temp_n3 = 0, temp_n4 = 0;
+	for (int i = 0; i < im.rows; ++i)
+		for (int j = 0; j < im.cols; ++j) {
 
-
+			if (assist_file.segment_result.at<uchar>(i,j) > 100) {
+				gray_value3 +=im.at<uchar>(i,j);
+				temp_n3++;
+			}
+			else {
+				gray_value4 += im.at<uchar>(i, j);
+				temp_n4++;
+			}
 
 		}
+	gray_value3 = gray_value3 / temp_n3;
+	gray_value4 = gray_value4 / temp_n4;
+	//判断是否过亮
+	if (abs(gray_value1 - gray_value2) > assist_file.xy_param["gray_value_t"][0] &&
+		//abs(gray_value1 - gray_value3) > assist_file.xy_param["gray_value_t"][0]&&
+		gray_value1 > assist_file.xy_param["gray_value_t1"][0]&&                
+		1.0*temp_n1/(temp_n1+temp_n2)>0.1&&
+		gray_value3> assist_file.xy_param["gray_value_t2"][0]
+		/*&&1.0*temp_n3 / (temp_n3 + temp_n4) > 0.1*/) {
+		too_high_ligth = true;
 	}
-	return water_line;
+ 	if (too_high_ligth) {
+		if (!assist_file.left_right_no_water) {
+			threshold(splt[0], temp, gray_value1 - 5, 255, CV_THRESH_BINARY);
+			int temp_water_line = get_water_line_seg(temp.colRange(c, 2 * c), assist_file.length, add_row, 0.4);
+			if (temp_water_line > 0.2*water_line && temp_water_line < water_line)
+				return temp_water_line;
+		}
+		int temp_t =otsu(splt[0].rowRange(0, water_line));
+		//if (temp_t < (gray_value3 + gray_value1) / 2 && (abs(gray_value1 - gray_value3) > assist_file.xy_param["gray_value_t"][0])) {
+		//	if (gray_value3 < assist_file.xy_param["gray_value_t1"][0])
+		//		temp_t = 0.65*gray_value3 + 0.35*gray_value1;
+		//	else
+		//		temp_t = gray_value3 - 5;
+		//}
+		threshold(splt[0], temp, temp_t, 255, CV_THRESH_BINARY);
+		if (assist_file.left_right_no_water) {
+			Mat temp1 = temp.colRange(0, c);
+			int temp_water_line1 = get_water_line_seg(temp1, assist_file.length, add_row, 0.4);
+			Mat temp2 = temp.colRange(2*c, 3*c);
+			int temp_water_line2 = get_water_line_seg(temp2, assist_file.length, add_row, 0.4);
+			int temp_water_line = temp_water_line1 > temp_water_line2 ? temp_water_line1 : temp_water_line2;
+			//hconcat(temp.colRange(0, 0.5*c), temp.colRange(c * 2.5, c * 3), temp);
+			if (temp_water_line < 0 || temp_water_line>water_line)
+				return water_line;
+			return temp_water_line;
+		}
+		else {
+			
+			int temp_water_line = get_water_line_seg(temp.colRange(c,2*c), assist_file.length, add_row, 0.4);
+			if (temp_water_line < 0 || temp_water_line>water_line)
+				return water_line;
+			return temp_water_line;
+		}
+	}
+	else {
+		if (assist_file.left_right_no_water) {
+			Mat temp = assist_file.segment_wrap_image;
+			Mat result;
+			hconcat(temp.colRange(0, 0.5*c), temp.colRange(c * 2.5, c * 3), result);
+			int temp_water_line = get_water_line_seg(result, assist_file.length, add_row, 0.4) - add_row;
+			if (temp_water_line < 0|| temp_water_line>water_line)
+				return water_line;
+			return temp_water_line;
+		}
+		else {
+			return water_line;
+		}
+	}
+
+	//Mat result;
+	//temp = splt[0].clone();
+	//hconcat(temp.colRange(0,0.5*c), temp.colRange(c*2.5, c*3), result);
+	//while (1) {
+	//	if (water_line >= assist_file.base_image.rows)
+	//		return water_line;
+	//	if (water_line < 2 * n_length)
+	//		return water_line;
+	//	temp = result.rowRange(water_line - 2 * n_length, water_line + add_row).clone();
+	//	int temp_t = otsu(temp);
+	//	threshold(temp, temp, temp_t, 255, CV_THRESH_BINARY);
+	//	//
+	//	vector<double> im_score(temp.rows, 0);
+	//	for (int i = 0; i < temp.rows; ++i) {
+	//		int n = 0;
+	//		for (int j = 0; j < temp.cols; ++j) {
+	//			if (temp.at<uchar>(i, j) > 100)
+	//				++n;
+	//		}
+	//		im_score[i] = n;
+	//	}
+	//	//
+	//	int water_line2 = 0;
+	//	int temp_n = 0;
+	//	for (int i = 0; i < temp.rows; ++i) {
+	//		if (im_score[i] > 0.6*temp.cols)
+	//			++water_line2;
+	//		else {
+	//			++temp_n;
+	//		}
+	//		if (temp_n > 6)
+	//			break;
+	//	}
+	//	if (temp_n <= 0) {
+	//		water_line = water_line - 2 * n_length;
+	//	}
+	//	else {
+	//		water_line = water_line - 2 * n_length + water_line2;
+	//		break;
+	//	}
+	//}
+
+ 	return water_line;
 }
 
 float get_water_line_night_local(Mat im, assist_information & assist_file)
@@ -1951,7 +2156,15 @@ int get_water_line_seg(Mat im, int length, int add_rows, float scale)
 	}
 	if (seg_line < 3 * n_length)
 		return seg_line - 2 * n_length;
-	//
+	if (seg_line > im.rows - add_rows) {
+		for (int i = im.rows - add_rows; i < im.rows; ++i) {
+			if (im_score[i] > scale*im.cols)
+				++temp_n;
+		}
+		if (temp_n > 0.8*n_length)
+			return im.rows - add_rows + 1;
+	}
+	
 	vector<double> div1;
 	vector<double> div2;
 	for (int i = 0; i < im.rows; ++i) {
@@ -1980,7 +2193,7 @@ int get_water_line_seg(Mat im, int length, int add_rows, float scale)
 		}
 		div1.push_back(n1 - n2);
 		div2.push_back(n1 - n3);
-
+		
 	}
 	int water_line1 = 0;
 	int water_line2 = 0;
@@ -1998,22 +2211,13 @@ int get_water_line_seg(Mat im, int length, int add_rows, float scale)
 			water_line2 = i;
 		}
 	}
-	if (water_line2 > im.rows - add_rows)
-		return water_line2;
-	// 判断是不是过长
-	int n_flag = 0;
-	for (int i = water_line2; i < water_line2 + add_rows; ++i) {
-		if (im_score[i]< 0.5*c)
-			++n_flag;
-	}
-	if (n_flag < 0.4*add_rows)
-		return im.rows - add_rows + 1;
-	else
-		return water_line2;
+	
+	return water_line2;
 
 }
 
-void save_file(Mat im, vector<assist_information> assist_files, map<string, string> main_ini)
+
+void save_file(Mat im, vector<assist_information> assist_files, map<string, string> main_ini) 
 {
 	//结果保存
 	Mat result = im.clone();
@@ -2069,8 +2273,8 @@ void save_file(Mat im, vector<assist_information> assist_files, map<string, stri
 	// 读写图像
 	cv::imwrite(main_ini["result_image"], result);
 	//fstream _file;
-	//_file.open(image_result, ios::in);
-	//if (!_file) {
+	//_file.open(image_result,ios::in);
+	//if (!_file) {	
 	//	imwrite(image_result, result);
 	//}
 	//_file.close();
@@ -2223,7 +2427,7 @@ vector<vector<double>> Mat2vector(Mat data)
 	return result;
 }
 
-int otsu(Mat im)
+int otsu(Mat im,bool flag)
 {
 	int nWidth = im.cols;
 	int nHeight = im.rows;
@@ -2309,5 +2513,8 @@ int otsu(Mat im)
 				y = highThresh;
 			}
 		}
-	return 0.5*x+0.5*y;
+	if (flag)
+		return y;
+	else
+		return x;
 }

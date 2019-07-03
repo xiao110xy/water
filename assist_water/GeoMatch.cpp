@@ -573,6 +573,11 @@ bool geo_match(Mat temp1, Mat temp2, float & score, Mat & draw_image, Point & re
 	assist_score.colRange(0, 0.1*c).setTo(-2);
 	assist_score.colRange(0.9*c, c).setTo(-2);
 	assist_score.rowRange(0.5*r, r).setTo(-2);
+	double max_score = -2;
+	for (int i = 0; i < assist_score.total(); ++i) {
+		if (max_score < *(assist_score.ptr<float>(0) + i))
+			max_score = *(assist_score.ptr<float>(0) + i);
+	}
 	//assist_score.setTo(1);
 	// 抑制部分，固定区域
 	if (roi.size() > 3) {
@@ -605,6 +610,19 @@ bool geo_match(Mat temp1, Mat temp2, float & score, Mat & draw_image, Point & re
 	//			result.y = i;
 	//		}
 	//	}
+	if (!color_flag) {
+		double temp_score = 0;
+		for(int i= -grayTemplateImg.rows / 4;i< grayTemplateImg.rows/4;++i)
+			for (int j = -grayTemplateImg.cols / 4; j < grayTemplateImg.cols/4; ++j) {
+				if (result.y + i < 0 || result.x + j < 0)
+					continue;
+				if (result.y + i > assist_score.rows || result.x + j > assist_score.cols)
+					continue;
+				temp_score += assist_score.at<float>(result.y+i, result.x+j);
+			}
+		temp_score /= grayTemplateImg.total()/4;
+		score = 0.5*score+0.5*temp_score;
+	}
 	draw_image = temp1.clone();
 	GM.DrawContours(draw_image, result, CV_RGB(0, 255, 0), 1);
 	//score = GM.FindGeoMatchModel(255-graySearchImg, minScore, greediness, result, assist_score);
