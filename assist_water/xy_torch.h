@@ -1,9 +1,11 @@
 ﻿#pragma once
-#include <torch/torch.h>
-#include <torch/script.h>
 #include <string>
 #include "opencv2/core/core.hpp"
 #include "opencv2/imgproc/imgproc.hpp"  
+#if defined(_WIN64)
+	#include <torch/torch.h>
+	#include <torch/script.h>
+
 
 class xy_torch {
 public:
@@ -57,3 +59,4 @@ public:
 		return temp_result;
 	};
 };
+#endif

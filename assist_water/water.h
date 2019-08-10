@@ -54,6 +54,8 @@ struct assist_information {
 		{"score3_t2",vector<double>{0.6}},
 		{"roi",vector<double>{}},
 		{"left_e",vector<double>{1}},
+		{"length_e",vector<double>{5}},
+		{"e_line",vector<double>{0}},
 		{"gray_value_t1",vector<double>{230}},
 		{"gray_value_t2",vector<double>{180}},
 		{"gray_value_t",vector<double>{30}},

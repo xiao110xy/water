@@ -314,7 +314,7 @@ void compute_water_area(Mat image, vector<assist_information> &assist_files, map
 			int min_y = assist_file.new_roi[1] >= 0 ? assist_file.new_roi[1] : 0;
 			int max_x = assist_file.new_roi[2] <= image.cols ? assist_file.new_roi[2] : image.cols;
 			int max_y = assist_file.new_roi[3] <= image.rows ? assist_file.new_roi[3] : image.rows;
-			Mat temp_im = image(Range(min_y, max_y), Range(min_x, max_x));
+			Mat temp_im = image(Range(min_y, max_y), Range(min_x, max_x)).clone();
 			if (!temp_im.data) {
 				cout << "deep model roi error!" << endl;
 				goto Deep_model_error;
@@ -1557,6 +1557,8 @@ int get_mask_line(Mat mask, int n_length,float scale,int class_n)
 int get_water_line(assist_information &assist_file)
 {
 	bool left_e = assist_file.xy_param["left_e"][0] < 0.5;
+	int length_e = assist_file.xy_param["length_e"][0];
+	bool e_line = assist_file.xy_param["e_line"][0] > 0.5;
 	Mat im = assist_file.wrap_image;
 	Mat ref_image = assist_file.ref_image;
 	//retinex_process(ref_image, ref_image);
@@ -1569,20 +1571,22 @@ int get_water_line(assist_information &assist_file)
 	float max_score = 0.8;
 	int n = assist_file.base_image.rows / length;
 	float det_score = 0;
-	int c1 = im.cols / 2, c2 = im.cols;
-	int temp_step_r = n/1.5 ;
-	int temp_step_c = (c2 - c1) / 6;
+	int c_det = e_line?im.cols:im.cols / 2;
+	int det_r = 0.2*length_e;
+	int temp_step_r = det_r*n /1.5 ;
+	int temp_step_c = c_det / 6;
+
+
 	// 一个E
 	int sum_d_r = 0;
-	for (int i = 0; i < (int)length / 5; ++i) {
+	for (int i = 0; i < (int)length / length_e; ++i) {
 		// 一个E区域
-		int r1 = i * 5 * n;
-		int r2 = (i + 1) * 5 * n;
+		int r1 = i * length_e * n;
+		int r2 = (i + 1) * length_e * n;
 
-		Mat temp1 = i % 2 == left_e ? im(Range(r1+ sum_d_r, r2+ sum_d_r), Range(0, c1)) :
-			im(Range(r1+ sum_d_r, r2+ sum_d_r), Range(c1, c2));
-		Mat temp2 = i % 2 == left_e ? ref_image(Range(r1 + temp_step_r, r2 - temp_step_r), Range(0 + temp_step_c, c1 - temp_step_c)) :
-			ref_image(Range(r1 + temp_step_r, r2 - temp_step_r), Range(c1 + temp_step_c, c2 - temp_step_c));
+		int c = i % 2 == left_e || e_line ? 0 : c_det;
+		Mat temp1 = im(Range(r1 + sum_d_r, r2 + sum_d_r), Range(c, c + c_det));
+		Mat temp2 = ref_image(Range(r1 + temp_step_r, r2 - temp_step_r), Range(c + temp_step_c, c + c_det - temp_step_c));
 		//Mat temp3 = i % 2 == 0 ? im_s(Range(r1, r2), Range(0, c1)) :
 		//	im(Range(r1, r2), Range(c1, c2));
 		// 求score
@@ -1617,17 +1621,15 @@ int get_water_line(assist_information &assist_file)
 	temp_score.clear();
 	// 一个E区域的1/5
 	for (int i = 0; i < 5; ++i) {
-		int r1 = score1.size() * 5 * n + (i - 1)* n;
-		int r2 = score1.size() * 5 * n + (i + 1) * n;
+		int r1 = score1.size() * length_e * n + (i - det_r)* n;
+		int r2 = score1.size() * length_e * n + (i + det_r) * n;
 		r1 = r1 >= 0 ? r1 : 0;
 		r2 = r2 <= im.rows - 1 ? r2 : im.rows - 1;
 		r1 = r1 < r2 ? r1 : r2;
 
-		Mat temp1 = score1.size() % 2 == left_e ? im(Range(r1, r2), Range(0, c1)) :
-			im(Range(r1, r2), Range(c1, c2));
-		Mat temp2 = score1.size() % 2 == left_e ?
-			ref_image(Range(r1, r2), Range(0 + temp_step_c, c1 - temp_step_c)) :
-			ref_image(Range(r1, r2), Range(c1 + temp_step_c, c2 - temp_step_c));
+		int c = score1.size() % 2 == left_e || e_line ? 0 : c_det;
+		Mat temp1 = im(Range(r1, r2), Range(c, c + c_det));
+		Mat temp2 = ref_image(Range(r1, r2), Range(c + temp_step_c, c + c_det - temp_step_c));
 		Mat temp;
 		matchTemplate(temp1, temp2, temp, CV_TM_CCOEFF_NORMED);
 		float score = -2;
@@ -1642,8 +1644,8 @@ int get_water_line(assist_information &assist_file)
 	score2 = process_score(temp_score, assist_file.xy_param["score2_t1"][0], assist_file.xy_param["score2_t2"][0]);
 	temp_score.clear();
 	// 子部分的值
-	for (int i = 0; i < n; ++i) {
-		int r1 = score1.size() * 5 * n + score2.size() * n + i - 1;
+	for (int i = 0; i < det_r*n; ++i) {
+		int r1 = score1.size() * length_e * n + score2.size() * n*det_r + i - 1;
 		int r2 = r1 + 1;
 		r1 = r1 >= 0 ? r1 : 0;
 		r2 = r2 <= ref_image.rows - 1 ? r2 : ref_image.rows - 1;
@@ -1652,12 +1654,9 @@ int get_water_line(assist_information &assist_file)
 			temp_score.push_back(0.3*max_score + 0.1);
 			break;
 		}
-		Mat temp1 = score1.size() % 2 == left_e ?
-			im(Range(r1, r2), Range(0, c1)) :
-			im(Range(r1, r2), Range(c1, c2));
-		Mat temp2 = score1.size() % 2 == left_e ?
-			ref_image(Range(r1, r2), Range(0 + temp_step_c, c1 - temp_step_c)) :
-			ref_image(Range(r1, r2), Range(c1 + temp_step_c, c2 - temp_step_c));
+		int c = score1.size() % 2 == left_e || e_line ? 0 : c_det;
+		Mat temp1 = im(Range(r1, r2), Range(c, c+c_det));
+		Mat temp2 = ref_image(Range(r1, r2), Range(c + temp_step_c, c + c_det - temp_step_c));
 		Mat temp;
 		matchTemplate(temp1, temp2, temp, CV_TM_CCOEFF_NORMED);
 		float score = -2;
@@ -1673,7 +1672,7 @@ int get_water_line(assist_information &assist_file)
 	score3 = process_score(temp_score, assist_file.xy_param["score3_t1"][0], assist_file.xy_param["score3_t2"][0]);
 	temp_score.clear();
 	
-	float water_number = length - 5 * score1.size() - score2.size() - score3.size() / 10.0;
+	float water_number = length - length_e * score1.size() - det_r*score2.size() - score3.size() / det_r/n;
 
 	return (1 - water_number / (double)length)*ref_image.rows;
 }
