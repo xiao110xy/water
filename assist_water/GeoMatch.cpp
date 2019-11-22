@@ -411,7 +411,7 @@ double GeoMatch::FindGeoMatchModel(Mat src,double minScore,double greediness, Po
 			if (temp_score < assist_score.at<float>(i, j))
 				temp_score = assist_score.at<float>(i, j);
 		}
-	for (i = 0; i < assist_score.rows/2; i++)
+	for (i = 0; i < assist_score.rows; i++)
 	{
 			for( j = 0; j < assist_score.cols; j++ )
              { 
@@ -420,7 +420,7 @@ double GeoMatch::FindGeoMatchModel(Mat src,double minScore,double greediness, Po
 					;
 				else
 					if (!color_flag)
-						if (assist_score.at<float>(i, j) < 0.3*temp_score)
+						if (assist_score.at<float>(i, j) < 0.1*temp_score)
 						continue;
 				 partialSum = 0; // initilize partialSum measure
 				 for(m=0;m<noOfCordinates;m++)
@@ -572,7 +572,7 @@ bool geo_match(Mat temp1, Mat temp2, float & score, Mat & draw_image, Point & re
 	int c = assist_score.cols;
 	assist_score.colRange(0, 0.1*c).setTo(-2);
 	assist_score.colRange(0.9*c, c).setTo(-2);
-	assist_score.rowRange(0.5*r, r).setTo(-2);
+	assist_score.rowRange(0.9*r, r).setTo(-2);
 	double max_score = -2;
 	for (int i = 0; i < assist_score.total(); ++i) {
 		if (max_score < *(assist_score.ptr<float>(0) + i))
@@ -583,10 +583,10 @@ bool geo_match(Mat temp1, Mat temp2, float & score, Mat & draw_image, Point & re
 	if (roi.size() > 3) {
 		GM.color_flag = false;
 		roi[0] = roi[0] - draw_image.cols / 2;
-		roi[2] = roi[2] - draw_image.cols / 2;
+		roi[2] = roi[2] + draw_image.cols / 2;
 
 		roi[1] = roi[1] - draw_image.rows / 2;
-		roi[3] = roi[3] - draw_image.rows / 2;
+		roi[3] = roi[3] + draw_image.rows / 2;
 		for (int i = 0; i < 4; ++i) {
 			roi[i] = roi[i] >= 0 ? roi[i] : 0;
 		}

@@ -53,9 +53,10 @@ struct assist_information {
 		{"score3_t1",vector<double>{0.3}},
 		{"score3_t2",vector<double>{0.6}},
 		{"roi",vector<double>{}},
-		{"left_e",vector<double>{1}},
 		{"length_e",vector<double>{5}},
-		{"e_line",vector<double>{0}},
+		{"left_e",vector<double>{1}},
+		{"swap_e",vector<double>{1}},
+		{"all_length_e",vector<double>{0}},
 		{"gray_value_t1",vector<double>{230}},
 		{"gray_value_t2",vector<double>{180}},
 		{"gray_value_t",vector<double>{30}},
@@ -84,6 +85,8 @@ struct assist_information {
 	double correct_score = -1;
 	vector<vector<double>> temp_correct_point;
 	vector<vector<double>> correct_point;
+	Point2d left_point{ 0, 0 };
+	Point2d right_point{ 0, 0 };
 	//float correct_line;
 	// 校正用点
 	bool correct2poly = true;
@@ -93,6 +96,7 @@ struct assist_information {
 	double rms_1, rms_2;
 	Mat mask;
 	Vec4f line_para;
+	vector<int> rect;
 	//ref
 	int ref_index;
 	Mat ref_image;
@@ -117,7 +121,7 @@ struct assist_information {
 
 // 读入辅助信息
 vector<string> getFiles(string folder, string firstname, string lastname);
-bool input_assist(Mat im,map<string, string> main_ini, vector<assist_information> &assist_files);
+bool input_assist(Mat &im,map<string, string> main_ini, vector<assist_information> &assist_files);
 bool get_number(string line_string, vector<double> &temp);
 bool input_assist_image(string file_name,assist_information &assist_file);
 void upadate_param(assist_information &assist_files, map<string, string> main_ini);
@@ -153,7 +157,10 @@ double compute_rms(Mat base_point, Mat wrap_point, Mat r);
 bool get_label_mask(Mat mask,int &label, Mat &label_mask, double,int y_t);
 float match_template_score(Mat temp1, Mat temp2);
 vector<float> process_score(vector<float> score, float score_t1, float score_t2, bool water_reflection= false);
-
+// 转换关系
+bool get_parrallel_lines(assist_information &assist_file);
+vector<double> interpolate_point(vector<double>&point1, vector<double> &point2, int y);
+Mat get_ref_index(assist_information& assist_file, Mat mask);
 // 白天水位线
 float get_water_line_day(Mat gc_im, assist_information &assist_file, int water_line, float scale = 0.4);
 float get_water_line_day_nowater(Mat gc_im, assist_information &assist_file, int water_line, float scale = 0.4);
