@@ -384,8 +384,8 @@ double GeoMatch::FindGeoMatchModel(Mat src,double minScore,double greediness, Po
 	// stoping criterias to search for model
 	//double normMinScore = minScore /noOfCordinates; // precompute minumum score 
 	//double normGreediness = ((1- greediness * minScore)/(1-greediness)) /noOfCordinates; // precompute greedniness 
-	double normMinScore = minScore /noOfCordinates; // precompute minumum score 
-	double normGreediness = ((1- greediness * minScore)/(1-greediness)) /noOfCordinates; // precompute greedniness 
+	//double normMinScore = minScore /noOfCordinates; // precompute minumum score 
+	//double normGreediness = ((1- greediness * minScore)/(1-greediness)) /noOfCordinates; // precompute greedniness 
 
 	for( i = 0; i < src.rows; i++ )
     {
@@ -419,9 +419,17 @@ double GeoMatch::FindGeoMatchModel(Mat src,double minScore,double greediness, Po
 				if (temp_r<0 || temp_c<0 || temp_r> assist_score.rows - 1 || temp_c> assist_score.cols - 1)
 					;
 				else
-					if (!color_flag)
-						if (assist_score.at<float>(i, j) < 0.1*temp_score)
+					;
+				if (!color_flag) {
+					float score_only = assist_score.at<float>(i, j);
+					if (score_only < -1.5)
 						continue;
+					if (abs(score_only) > 0.2*temp_score)
+						;
+					else
+						continue;
+				}
+					
 				 partialSum = 0; // initilize partialSum measure
 				 for(m=0;m<noOfCordinates;m++)
 				 {
@@ -439,7 +447,7 @@ double GeoMatch::FindGeoMatchModel(Mat src,double minScore,double greediness, Po
 					if((iSx!=0 || iSy!=0) && (iTx!=0 || iTy!=0))
 					 {
 						 //partial Sum  = Sum of(((Source X derivative* Template X drivative) + Source Y derivative * Template Y derivative)) / Edge magnitude of(Template)* edge magnitude of(Source))
-						 partialSum = partialSum + ((iSx*iTx)+(iSy*iTy))*(edgeMagnitude[m] * magMat.at<double>(curX, curY));
+						 partialSum = partialSum + (iSx*iTx+ iSy*iTy)*(edgeMagnitude[m] * magMat.at<double>(curX, curY));
 									
 					 }
 
@@ -448,11 +456,11 @@ double GeoMatch::FindGeoMatchModel(Mat src,double minScore,double greediness, Po
 					// check termination criteria
 					// if partial score score is less than the score than needed to make the required score at that position
 					// break serching at that coordinate.
-					//normMinScore = resultScore / noOfCordinates; // precompute minumum score 
-					//normGreediness = ((1 - greediness * resultScore) / (1 - greediness)) / noOfCordinates; // precompute greedniness 
+					double normMinScore = resultScore / noOfCordinates; // precompute minumum score 
+					double normGreediness = ((1 - greediness * resultScore) / (1 - greediness)) / noOfCordinates; // precompute greedniness 
 
-					//if( partialScore < (MIN((1-resultScore ) + normGreediness*sumOfCoords,normMinScore*  sumOfCoords)))
-					//	break;
+					if( partialScore < (MIN((1-resultScore ) + normGreediness*sumOfCoords,normMinScore*  sumOfCoords)))
+						break;
 
 				}
 				if(partialScore > resultScore)
@@ -523,8 +531,8 @@ bool geo_match(Mat temp1, Mat temp2, float & score, Mat & draw_image, Point & re
 	GM.color_flag = color_flag;
 	int lowThreshold = 10;		//deafult value
 	int highThreashold = 50;	//deafult value
-	double minScore = 0.6;		//deafult value
-	double greediness = 0.4;		//deafult value
+	double minScore = 0.1;		//deafult value
+	double greediness = 0.1;		//deafult value
 
 	//IplImage* templateImage = cvCloneImage(&(IplImage)temp2);
 	//if (templateImage == NULL)
@@ -565,9 +573,15 @@ bool geo_match(Mat temp1, Mat temp2, float & score, Mat & draw_image, Point & re
 		graySearchImg = searchImage.clone();
 	}
 	GaussianBlur(searchImage, searchImage, cvSize(5, 5), 0);
-	Mat assist_score;
 
+	Mat assist_score;
 	matchTemplate(graySearchImg, grayTemplateImg, assist_score, CV_TM_CCOEFF_NORMED);
+	//for (int i = 0; i < assist_score.total(); ++i) {
+	//	float temp = *(assist_score.ptr<float>(0) + i);
+	//	temp = abs(temp);
+	//	*(assist_score.ptr<float>(0) + i) = temp;
+	//}
+
 	int r = assist_score.rows;
 	int c = assist_score.cols;
 	assist_score.colRange(0, 0.1*c).setTo(-2);
@@ -583,10 +597,10 @@ bool geo_match(Mat temp1, Mat temp2, float & score, Mat & draw_image, Point & re
 	if (roi.size() > 3) {
 		GM.color_flag = false;
 		roi[0] = roi[0] - draw_image.cols / 2;
-		roi[2] = roi[2] + draw_image.cols / 2;
+		roi[2] = roi[2] - draw_image.cols / 2;
 
 		roi[1] = roi[1] - draw_image.rows / 2;
-		roi[3] = roi[3] + draw_image.rows / 2;
+		roi[3] = roi[3] - draw_image.rows / 2;
 		for (int i = 0; i < 4; ++i) {
 			roi[i] = roi[i] >= 0 ? roi[i] : 0;
 		}

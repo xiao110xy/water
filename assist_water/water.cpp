@@ -75,8 +75,8 @@ bool input_assist(Mat &im,map<string, string> main_ini, vector<assist_informatio
 	vector<vector<Mat>> gauss_pyr, dog_pyr;
 	vector<KeyPoint> keypoints;
 	Mat descriptors;
-	sift.detect(im, gauss_pyr, dog_pyr, keypoints);
-	sift.comput_des(gauss_pyr, keypoints, descriptors);
+	//sift.detect(im, gauss_pyr, dog_pyr, keypoints);
+	//sift.comput_des(gauss_pyr, keypoints, descriptors);
 
 
 	while (!assist_file_name.eof())
@@ -315,6 +315,7 @@ void compute_water_area(Mat image, vector<assist_information> &assist_files, map
 			image_rotate = correct_image(image, assist_file);
 			//判断是否为无图像区域
 			//  判断是否全是水
+
 			if (isblank(image, assist_file)) {
 				assist_file.parrallel_left.clear();
 				assist_file.parrallel_right.clear();
@@ -337,6 +338,7 @@ void compute_water_area(Mat image, vector<assist_information> &assist_files, map
 			int max_x = assist_file.new_roi[2] <= image.cols ? assist_file.new_roi[2] : image.cols;
 			int max_y = assist_file.new_roi[3] <= image.rows ? assist_file.new_roi[3] : image.rows;
 			Mat temp_im = image(Range(min_y, max_y), Range(min_x, max_x)).clone();
+			//cvtColor(temp_im, temp_im, CV_BGR2RGB);
 			if (!temp_im.data) {
 				cout << "deep model roi error!" << endl;
 				goto Deep_model_error;
@@ -570,6 +572,8 @@ bool isblank(Mat im, assist_information &assist_file)
 	}
 	temp_assist_file.correct2poly = true;
 	Mat image_rotate = correct_image(im, temp_assist_file);
+	assist_file.expand_wrap_image = image_rotate.clone();
+
 	// 根据颜色去除
 	Mat temp_im;
 	cvtColor(image_rotate, temp_im, CV_BGR2GRAY);
@@ -595,11 +599,12 @@ bool isblank(Mat im, assist_information &assist_file)
 		if (temp[0] == temp[1] && temp[1] == temp[2] && temp[0] == 1024)
 			num_zeros = num_zeros + 1;
 	}
+
+
 	num_zeros = num_zeros / assist_file.base_image.total();
 	if (num_zeros > 0.3)
 		return true;
 	//
-	assist_file.expand_wrap_image = image_rotate.clone();
 	// 扩充一下
 	if (isgrayscale(im)) {
 		int add_row = 10.0*temp_assist_file.base_image.rows / temp_assist_file.length;
@@ -642,7 +647,7 @@ bool isblank(Mat im, assist_information &assist_file)
 		matchTemplate(temp1, temp3, temp, CV_TM_SQDIFF);
 		score2 = temp.at<float>(0, 0);
 		if (score1 < 0.05 && score2 < 0.05)
-			return true;
+			return false;
 
 	}
 	else {
@@ -674,8 +679,6 @@ bool isblank(Mat im, assist_information &assist_file)
 			float matMean2 = mean(temp2).val[0];
 			float matMean3 = mean(temp3).val[0];
 			if (abs(matMean1 - matMean2) < 5 && abs(matMean1 - matMean3) < 5)
-				return true;
-			else
 				return false;
 		}
 			
@@ -794,21 +797,22 @@ bool correct_control_point(Mat im, assist_information & assist_file)
 	vector<vector<Mat>> gauss_pyr_2, dog_pyr_2;
 	vector<KeyPoint> keypoints_2;
 	Mat descriptors_2;
-	sift.detect(roi_image, gauss_pyr_2, dog_pyr_2, keypoints_2);
-	sift.comput_des(gauss_pyr_2, keypoints_2, descriptors_2);
-	//最近邻与次近邻距离比匹配
-	Ptr<DescriptorMatcher> matcher = new FlannBasedMatcher;
-	std::vector<vector<DMatch>> dmatchs;
-	if (assist_file.descriptors.total() < 5)
-		return false;
-	if (descriptors_2.total() < 5)
-		return false;
-	matcher->knnMatch(assist_file.descriptors, descriptors_2, dmatchs, 2);
+	//sift.detect(roi_image, gauss_pyr_2, dog_pyr_2, keypoints_2);
+	//sift.comput_des(gauss_pyr_2, keypoints_2, descriptors_2);
+	////最近邻与次近邻距离比匹配
+	//Ptr<DescriptorMatcher> matcher = new FlannBasedMatcher;
+	//std::vector<vector<DMatch>> dmatchs;
+	//if (assist_file.descriptors.total() < 5)
+	//	return false;
+	//if (descriptors_2.total() < 5)
+	//	return false;
+	//matcher->knnMatch(assist_file.descriptors, descriptors_2, dmatchs, 2);
 	// 不使用roi
 	Mat homography, match_line_image;
 	vector<vector<double>> temp_point;
-	vector<assist_registration> temp_assist_reg = xy_match(im, roi_image, dmatchs, assist_file.keypoints,keypoints_2,
-													model,1, assist_file.xy_param["roi"]);
+	//vector<assist_registration> temp_assist_reg = xy_match(im, roi_image, dmatchs, assist_file.keypoints,keypoints_2,
+	//												model,1, assist_file.xy_param["roi"]);
+	vector<assist_registration> temp_assist_reg;
 	//if (1){
  	if (temp_assist_reg.size() == 1) {
 		homography = temp_assist_reg[0].homography.clone();
@@ -860,13 +864,22 @@ bool correct_control_point(Mat im, assist_information & assist_file)
 		}
 		//temp.colRange(0, 700).setTo(Scalar{ 0,0,0 });
 		float score1 = -2,score2 = -2;
-		geo_match(temp, assist_image,score1, draw_image, result, assist_file.xy_param["roi"],!isgrayscale(assist_image));
+
+		geo_match(temp, assist_image,score1,draw_image, result, assist_file.xy_param["roi"],!isgrayscale(assist_image));
 		if (score1 > score) {
 			score = score1;
 			temp_r = result.y;
 			temp_c = result.x;
 		}
-		//geo_match(temp, roi_image, score2, draw_image, result, !isgrayscale(assist_image));
+		//for (int i = 0; i < assist_image.rows; i++) {
+		//	for (int j = 0; j < assist_image.cols; j++) {
+		//		assist_image.at<Vec3b>(i, j)(0) = 255 - assist_image.at<Vec3b>(i, j)(0);
+		//		assist_image.at<Vec3b>(i, j)(1) = 255 - assist_image.at<Vec3b>(i, j)(1);
+		//		assist_image.at<Vec3b>(i, j)(2) = 255-assist_image.at<Vec3b>(i, j)(2);
+		//
+		//	}
+		//}
+		//geo_match(temp, assist_image, score2, assist_score, draw_image, result, assist_file.xy_param["roi"], !isgrayscale(assist_image));
 		//if (score2 > score) {
 		//	score = score2;
 		//	temp_r = result.y;
@@ -1528,7 +1541,7 @@ bool get_parrallel_lines(assist_information & assist_file)
 	}
 	stable_sort(Points.begin(), Points.end(),
 		[](vector<double> a, vector<double> b) {return a[4] > b[4]; });
-	if (loss > temp_point.size() * 5)
+	if (loss > (temp_point.size()-2) * 5)
 		return true;
 	// 插值
 	vector<double> first = interpolate_point(Points[0], Points[1], 0);
@@ -2566,7 +2579,7 @@ void save_file(Mat im, vector<assist_information> assist_files, map<string, stri
 
 	}
 	// 读写图像
-	cv::imwrite(main_ini["result_image"], result);
+ 	cv::imwrite(main_ini["result_image"], result);
 	//fstream _file; 
 	//_file.open(image_result,ios::in);
 	//if (!_file) {	

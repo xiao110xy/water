@@ -24,3 +24,4 @@ enc_temp_folder
 */GeneratedFiles
 /openpiv-c--qt/fftw3
 /water_flow.cpp
+*.vcxproj
